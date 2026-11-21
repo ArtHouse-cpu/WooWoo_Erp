@@ -538,7 +538,7 @@ export function ServiceQueryModal({
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                          Preferred Time Slot <span className="text-[#EA580C]">*</span>
+                         Select Time Slot  <span className="text-[#EA580C]">*</span>
                         </label>
                         <span
                           className={`text-xs font-bold ${

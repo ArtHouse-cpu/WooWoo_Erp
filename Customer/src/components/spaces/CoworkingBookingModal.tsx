@@ -95,6 +95,7 @@ export interface CoworkingBookingModalProps {
   space?: SpaceCard | null;
   initialPlanId?: string;
   initialStartDate?: string | Date;
+  pricingType?: 'regular' | 'membership';
   onSuccess?: () => void;
 }
 
@@ -125,6 +126,7 @@ export function CoworkingBookingModal({
   space,
   initialPlanId = 'monthly',
   initialStartDate,
+  pricingType = 'membership',
   onSuccess,
 }: CoworkingBookingModalProps) {
   const navigate = useNavigate();
@@ -135,6 +137,10 @@ export function CoworkingBookingModal({
   const [step, setStep] = useState<'booking' | 'confirmed'>('booking');
   const [isProcessing, setIsProcessing] = useState(false);
   const [bookingId, setBookingId] = useState('WOO-274918');
+
+  // Pricing type: 'regular' (no membership) vs 'membership' (bundled with Premium)
+  const [selectedPricingType, setSelectedPricingType] = useState<'regular' | 'membership'>(pricingType);
+  const isRegular = selectedPricingType === 'regular';
 
   // Plan resolution: detect from space name or use initialPlanId, default to monthly
   const detectedPlanId = useMemo(() => {
@@ -174,12 +180,13 @@ export function CoworkingBookingModal({
       setReceipt(null);
       setIsProcessing(false);
       setSelectedPlanId(detectedPlanId || 'monthly');
+      setSelectedPricingType(pricingType || 'membership');
       if (initialStartDate) {
         const parsed = new Date(initialStartDate);
         if (!isNaN(parsed.getTime())) setStartDateObj(parsed);
       }
     }
-  }, [isOpen, detectedPlanId, initialStartDate]);
+  }, [isOpen, detectedPlanId, initialStartDate, pricingType]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -217,11 +224,19 @@ export function CoworkingBookingModal({
   }, [startDateObj, currentPlan.durationDays]);
 
   // Pricing calculations
-  const totalRegular = PREMIUM_MEMBERSHIP.regularPrice + currentPlan.regularPrice;
-  const subtotalYourPrice = PREMIUM_MEMBERSHIP.discountedPrice + currentPlan.memberPrice;
+  const totalRegular = isRegular
+    ? currentPlan.regularPrice
+    : PREMIUM_MEMBERSHIP.regularPrice + currentPlan.regularPrice;
+
+  const subtotalYourPrice = isRegular
+    ? currentPlan.regularPrice
+    : PREMIUM_MEMBERSHIP.discountedPrice + currentPlan.memberPrice;
+
   const couponDiscount = appliedCoupon ? appliedCoupon.discount : 0;
   const finalPayable = Math.max(0, subtotalYourPrice - couponDiscount);
-  const totalSavings = (totalRegular - subtotalYourPrice) + couponDiscount;
+  const totalSavings = isRegular
+    ? couponDiscount
+    : (totalRegular - subtotalYourPrice) + couponDiscount;
 
   const handleApplyCoupon = async () => {
     const code = couponCode.trim().toUpperCase();
@@ -236,6 +251,7 @@ export function CoworkingBookingModal({
         drink: preferredDrink,
         couponCode: code,
         spaceId: space?.id,
+        pricingType: selectedPricingType,
       });
       if (quote.couponError || !quote.coupon) {
         toast.error(quote.couponError || 'This coupon cannot be used.');
@@ -265,6 +281,7 @@ export function CoworkingBookingModal({
         drink: preferredDrink,
         couponCode: appliedCoupon?.code || undefined,
         spaceId: space?.id,
+        pricingType: selectedPricingType,
       });
       if (started.mode === 'free') {
         setReceipt(started.booking);
@@ -281,7 +298,9 @@ export function CoworkingBookingModal({
           amount: started.amount,
           currency: started.currency,
           name: 'WOOWOO Art House',
-          description: `CoWorking ${currentPlan.subtitle}`,
+          description: isRegular
+            ? `CoWorking ${currentPlan.subtitle} (Regular)`
+            : `CoWorking ${currentPlan.subtitle} + Premium`,
           prefill: {name: customer?.name, email: customer?.email, contact: customer?.mobile},
           onSuccess: response => {
             verifyCoworkingCheckout({
@@ -295,7 +314,9 @@ export function CoworkingBookingModal({
                 setStep('confirmed');
                 recordPortalEnquiry({
                   enquiryType: 'Space',
-                  itemName: `Coworking · ${currentPlan.subtitle}`,
+                  itemName: isRegular
+                    ? `Coworking · ${currentPlan.subtitle} (Regular)`
+                    : `Coworking · ${currentPlan.subtitle} + Premium`,
                   description: `Paid coworking booking ${booking.bookingCode}. Amount ₹${formatInr(booking.payable)}.`,
                 });
                 toast.success('Payment successful. Booking confirmed.');
@@ -325,19 +346,31 @@ export function CoworkingBookingModal({
 
   // WhatsApp sender
   const handleOpenWhatsApp = () => {
-    const message = [
-      `*WooWoo CoWorking & Premium Booking Confirmed!*`,
-      `Booking ID: ${bookingId}`,
-      `----------------------------------`,
-      `👑 *Membership:* Premium Membership (365 Days)`,
-      `💻 *Plan:* CoWorking Plan - ${currentPlan.subtitle}`,
-      `📅 *Membership Period:* ${startsOnStr} – ${expiresOnStr}`,
-      `📅 *CoWorking Period:* ${startsOnStr} – ${coworkingEndStr}`,
-      `☕ *Free Drink:* ${preferredDrink}`,
-      `----------------------------------`,
-      `💳 *Amount Paid:* ₹${formatInr(finalPayable)}`,
-      `🎉 *Total Savings:* ₹${formatInr(totalSavings)}`,
-    ].join('\n');
+    const message = isRegular
+      ? [
+          `*WooWoo CoWorking Booking Confirmed!*`,
+          `Booking ID: ${bookingId}`,
+          `----------------------------------`,
+          `💻 *Plan:* CoWorking Plan - ${currentPlan.subtitle}`,
+          `📅 *CoWorking Period:* ${startsOnStr} – ${coworkingEndStr}`,
+          `☕ *Free Drink:* ${preferredDrink}`,
+          `----------------------------------`,
+          `💳 *Amount Paid:* ₹${formatInr(finalPayable)}`,
+          ...(totalSavings > 0 ? [`🎉 *Total Savings:* ₹${formatInr(totalSavings)}`] : []),
+        ].join('\n')
+      : [
+          `*WooWoo CoWorking & Premium Booking Confirmed!*`,
+          `Booking ID: ${bookingId}`,
+          `----------------------------------`,
+          `👑 *Membership:* Premium Membership (365 Days)`,
+          `💻 *Plan:* CoWorking Plan - ${currentPlan.subtitle}`,
+          `📅 *Membership Period:* ${startsOnStr} – ${expiresOnStr}`,
+          `📅 *CoWorking Period:* ${startsOnStr} – ${coworkingEndStr}`,
+          `☕ *Free Drink:* ${preferredDrink}`,
+          `----------------------------------`,
+          `💳 *Amount Paid:* ₹${formatInr(finalPayable)}`,
+          `🎉 *Total Savings:* ₹${formatInr(totalSavings)}`,
+        ].join('\n');
 
     const waUrl = `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank');
@@ -353,8 +386,8 @@ export function CoworkingBookingModal({
       drink: preferredDrink,
       startDate: startsOnStr,
       coworkingEnd: coworkingEndStr,
-      membershipEnd: expiresOnStr,
-      membershipName: 'Premium Membership (365 Days)',
+      membershipEnd: isRegular ? '' : expiresOnStr,
+      membershipName: isRegular ? '' : 'Premium Membership (365 Days)',
       regularTotal: totalRegular,
       payable: finalPayable,
       savings: totalSavings,
@@ -410,65 +443,88 @@ export function CoworkingBookingModal({
               </button>
             </div>
 
-            {/* Combined Plan Selection Banner */}
-            <div className="rounded-2xl border border-purple-200/70 bg-[#FAF7FF] p-2.5 sm:p-3 flex items-center justify-between gap-2 shadow-2xs">
-              <div className="flex min-w-0 items-center gap-2 sm:gap-2.5 flex-1">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#FEF3C7] border border-amber-200/60 text-amber-500 shrink-0">
-                  <Crown className="h-4 w-4 sm:h-4.5 sm:w-4.5 fill-amber-500 text-amber-500" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-black leading-tight text-slate-900">
-                    Premium Membership
+            {/* Plan Selection Banner */}
+            {isRegular ? (
+              <div className="rounded-2xl border border-purple-200/70 bg-[#FAF7FF] p-2.5 sm:p-3 flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex min-w-0 items-center gap-2.5 flex-1">
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-purple-100 border border-purple-200/60 text-[#673DE6] shrink-0">
+                    <Laptop className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2.2]" />
                   </div>
-                  <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-none mt-0.5">
-                    365 Days Access
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#673DE6] text-white shadow-xs">
-                <Plus size={12} strokeWidth={3} />
-              </div>
-
-              <div className="flex min-w-0 items-center gap-2 sm:gap-2.5 flex-1 pl-1">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#FEF3C7] border border-amber-200/60 text-amber-600 shrink-0">
-                  <Laptop className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2.2]" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-black leading-tight text-slate-900">
-                    CoWorking Plan
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-none truncate mt-0.5">
-                    {currentPlan.subtitle}
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-black leading-tight text-slate-900">
+                      CoWorking Plan
+                    </div>
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-none truncate mt-0.5">
+                      {currentPlan.subtitle}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Card 2: Premium (365 Days) */}
-            <div className="rounded-2xl border border-purple-100/90 bg-white p-2.5 sm:p-3 shadow-2xs space-y-1.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#FEF3C7] border border-amber-200/60 text-amber-500 shrink-0">
-                  <Crown size={13} className="fill-amber-500 text-amber-500" />
-                </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900">
-                  Premium (365 Days)
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10.5px] sm:text-xs font-black bg-[#F5F0FF] text-[#673DE6] border border-purple-200/80 shrink-0">
+                  Regular Price
                 </span>
               </div>
-
-              <div className="grid grid-cols-2 divide-x divide-slate-100 pt-0.5 text-[11px] sm:text-xs">
-                <div className="flex items-center gap-1.5 text-slate-700 pr-2">
-                  <Calendar size={13} className="text-[#673DE6] shrink-0" />
-                  <span className="text-slate-400 font-medium">Starts:</span>
-                  <span className="font-bold text-slate-900 truncate">{startsOnStr}</span>
+            ) : (
+              <div className="rounded-2xl border border-purple-200/70 bg-[#FAF7FF] p-2.5 sm:p-3 flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-2.5 flex-1">
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#FEF3C7] border border-amber-200/60 text-amber-500 shrink-0">
+                    <Crown className="h-4 w-4 sm:h-4.5 sm:w-4.5 fill-amber-500 text-amber-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-black leading-tight text-slate-900">
+                      Premium Membership
+                    </div>
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-none mt-0.5">
+                      365 Days Access
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-slate-700 pl-3">
-                  <Calendar size={13} className="text-[#673DE6] shrink-0" />
-                  <span className="text-slate-400 font-medium">Expires:</span>
-                  <span className="font-bold text-slate-900 truncate">{expiresOnStr}</span>
+
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#673DE6] text-white shadow-xs">
+                  <Plus size={12} strokeWidth={3} />
+                </div>
+
+                <div className="flex min-w-0 items-center gap-2 sm:gap-2.5 flex-1 pl-1">
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#FEF3C7] border border-amber-200/60 text-amber-600 shrink-0">
+                    <Laptop className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-black leading-tight text-slate-900">
+                      CoWorking Plan
+                    </div>
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-none truncate mt-0.5">
+                      {currentPlan.subtitle}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Card 2: Premium (365 Days) - Only shown in Premium Membership Flow */}
+            {!isRegular && (
+              <div className="rounded-2xl border border-purple-100/90 bg-white p-2.5 sm:p-3 shadow-2xs space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#FEF3C7] border border-amber-200/60 text-amber-500 shrink-0">
+                    <Crown size={13} className="fill-amber-500 text-amber-500" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-black text-slate-900">
+                    Premium (365 Days)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 divide-x divide-slate-100 pt-0.5 text-[11px] sm:text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-700 pr-2">
+                    <Calendar size={13} className="text-[#673DE6] shrink-0" />
+                    <span className="text-slate-400 font-medium">Starts:</span>
+                    <span className="font-bold text-slate-900 truncate">{startsOnStr}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-700 pl-3">
+                    <Calendar size={13} className="text-[#673DE6] shrink-0" />
+                    <span className="text-slate-400 font-medium">Expires:</span>
+                    <span className="font-bold text-slate-900 truncate">{expiresOnStr}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Card 3: CoWorking Plan */}
             <div className="rounded-2xl border border-purple-100/90 bg-white p-2.5 sm:p-3 shadow-2xs space-y-1.5">
@@ -507,40 +563,47 @@ export function CoworkingBookingModal({
                       }`}
                     >
                       <span>{plan.subtitle}</span>
-                      <span>₹{formatInr(plan.memberPrice)}</span>
+                      <span>₹{formatInr(isRegular ? plan.regularPrice : plan.memberPrice)}</span>
                     </button>
                   ))}
                 </div>
               )}
 
-              <div
-                className="relative flex items-center gap-1.5 pt-0.5 text-[11px] sm:text-xs cursor-pointer"
-                onClick={() => {
-                  if (dateInputRef.current) {
-                    if (typeof dateInputRef.current.showPicker === 'function') {
-                      dateInputRef.current.showPicker();
-                    } else {
-                      dateInputRef.current.focus();
-                    }
-                  }
-                }}
-              >
-                <Calendar size={13} className="text-[#673DE6] shrink-0" />
-                <span className="text-slate-400 font-medium">Start:</span>
-                <span className="font-bold text-slate-900">{startsOnStr}</span>
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={toInputDateString(startDateObj)}
-                  onChange={e => {
-                    if (e.target.value) {
-                      const [y, m, d] = e.target.value.split('-').map(Number);
-                      setStartDateObj(new Date(y, m - 1, d));
+              <div className="grid grid-cols-2 divide-x divide-slate-100 pt-0.5 text-[11px] sm:text-xs">
+                <div
+                  className="relative flex items-center gap-1.5 pr-2 cursor-pointer"
+                  onClick={() => {
+                    if (dateInputRef.current) {
+                      if (typeof dateInputRef.current.showPicker === 'function') {
+                        dateInputRef.current.showPicker();
+                      } else {
+                        dateInputRef.current.focus();
+                      }
                     }
                   }}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  aria-label="Choose Start Date"
-                />
+                >
+                  <Calendar size={13} className="text-[#673DE6] shrink-0" />
+                  <span className="text-slate-400 font-medium">Start:</span>
+                  <span className="font-bold text-slate-900 truncate">{startsOnStr}</span>
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={toInputDateString(startDateObj)}
+                    onChange={e => {
+                      if (e.target.value) {
+                        const [y, m, d] = e.target.value.split('-').map(Number);
+                        setStartDateObj(new Date(y, m - 1, d));
+                      }
+                    }}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    aria-label="Choose Start Date"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 pl-3 text-slate-700">
+                  <Calendar size={13} className="text-[#673DE6] shrink-0" />
+                  <span className="text-slate-400 font-medium">Valid Till:</span>
+                  <span className="font-bold text-slate-900 truncate">{coworkingEndStr}</span>
+                </div>
               </div>
             </div>
 
@@ -608,63 +671,92 @@ export function CoworkingBookingModal({
                 <h4 className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#3B0764]">
                   PLAN SUMMARY
                 </h4>
-                <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 sm:px-2.5 py-0.5 rounded-full">
-                  <PiggyBank size={12} className="shrink-0" />
-                  <span>Total Savings: ₹{formatInr(totalSavings)}</span>
-                </div>
+                {totalSavings > 0 ? (
+                  <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 sm:px-2.5 py-0.5 rounded-full">
+                    <PiggyBank size={12} className="shrink-0" />
+                    <span>Total Savings: ₹{formatInr(totalSavings)}</span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500">
+                    Regular Pricing
+                  </span>
+                )}
               </div>
 
-              {/* Side by side pricing cards in ONE ROW (strictly grid-cols-2 repeat(2, minmax(0, 1fr))) */}
-              <div
-                className="grid grid-cols-2 gap-2"
-                style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
-              >
-                {/* Premium Card */}
-                <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
-                  <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-black text-slate-900 truncate">
-                    <Crown size={12} className="shrink-0 fill-amber-500 text-amber-500" />
-                    <span className="truncate">Premium (365D)</span>
+              {isRegular ? (
+                /* Regular Pricing Card */
+                <div className="rounded-xl border border-purple-100 bg-white p-2.5 sm:p-3 shadow-3xs flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-900 truncate">
+                      <Laptop size={14} className="shrink-0 text-[#673DE6]" />
+                      <span className="truncate">{currentPlan.subtitle}</span>
+                    </div>
+                    <div className="text-[10.5px] sm:text-[11px] font-medium text-slate-500 mt-0.5">
+                      Duration: {currentPlan.durationDays} Day{currentPlan.durationDays > 1 ? 's' : ''} (Qty: 1)
+                    </div>
                   </div>
-                  <div className="mt-1 flex items-baseline justify-between text-xs">
-                    <span className="text-slate-400 line-through text-[9.5px] sm:text-[10px]">
-                      ₹{formatInr(PREMIUM_MEMBERSHIP.regularPrice)}
-                    </span>
-                    <span className="font-bold text-slate-900 text-[11px] sm:text-xs">
-                      ₹{formatInr(PREMIUM_MEMBERSHIP.discountedPrice)}
-                    </span>
-                  </div>
-                  <div className="text-[9.5px] sm:text-[10px] font-bold text-emerald-600 text-right">
-                    Save ₹{formatInr(PREMIUM_MEMBERSHIP.savings)}
-                  </div>
-                </div>
-
-                {/* CoWorking Plan Card */}
-                <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
-                  <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-black text-slate-900 truncate">
-                    <Laptop size={12} className="shrink-0 text-[#673DE6]" />
-                    <span className="truncate">{currentPlan.subtitle}</span>
-                  </div>
-                  <div className="mt-1 flex items-baseline justify-between text-xs">
-                    <span className="text-slate-400 line-through text-[9.5px] sm:text-[10px]">
+                  <div className="text-right shrink-0 pl-2">
+                    <div className="font-black text-slate-900 text-xs sm:text-sm">
                       ₹{formatInr(currentPlan.regularPrice)}
-                    </span>
-                    <span className="font-bold text-slate-900 text-[11px] sm:text-xs">
-                      ₹{formatInr(currentPlan.memberPrice)}
-                    </span>
-                  </div>
-                  <div className="text-[9.5px] sm:text-[10px] font-bold text-emerald-600 text-right">
-                    Save ₹{formatInr(currentPlan.savings)}
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-400">Regular Price</div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* Side by side pricing cards in ONE ROW (strictly grid-cols-2 repeat(2, minmax(0, 1fr))) */
+                <div
+                  className="grid grid-cols-2 gap-2"
+                  style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+                >
+                  {/* Premium Card */}
+                  <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
+                    <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-black text-slate-900 truncate">
+                      <Crown size={12} className="shrink-0 fill-amber-500 text-amber-500" />
+                      <span className="truncate">Premium (365D)</span>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between text-xs">
+                      <span className="text-slate-400 line-through text-[9.5px] sm:text-[10px]">
+                        ₹{formatInr(PREMIUM_MEMBERSHIP.regularPrice)}
+                      </span>
+                      <span className="font-bold text-slate-900 text-[11px] sm:text-xs">
+                        ₹{formatInr(PREMIUM_MEMBERSHIP.discountedPrice)}
+                      </span>
+                    </div>
+                    <div className="text-[9.5px] sm:text-[10px] font-bold text-emerald-600 text-right">
+                      Save ₹{formatInr(PREMIUM_MEMBERSHIP.savings)}
+                    </div>
+                  </div>
+
+                  {/* CoWorking Plan Card */}
+                  <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
+                    <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-black text-slate-900 truncate">
+                      <Laptop size={12} className="shrink-0 text-[#673DE6]" />
+                      <span className="truncate">{currentPlan.subtitle}</span>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between text-xs">
+                      <span className="text-slate-400 line-through text-[9.5px] sm:text-[10px]">
+                        ₹{formatInr(currentPlan.regularPrice)}
+                      </span>
+                      <span className="font-bold text-slate-900 text-[11px] sm:text-xs">
+                        ₹{formatInr(currentPlan.memberPrice)}
+                      </span>
+                    </div>
+                    <div className="text-[9.5px] sm:text-[10px] font-bold text-emerald-600 text-right">
+                      Save ₹{formatInr(currentPlan.savings)}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Total Payable Row */}
               <div className="flex items-center justify-between rounded-xl bg-[#F0E8FF] px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-black text-[#3B0764]">
                 <span>Total Payable Amount</span>
                 <div className="flex items-baseline gap-1.5 sm:gap-2">
-                  <span className="text-[10px] sm:text-[11px] font-medium text-slate-400 line-through">
-                    ₹{formatInr(totalRegular)}
-                  </span>
+                  {couponDiscount > 0 || !isRegular ? (
+                    <span className="text-[10px] sm:text-[11px] font-medium text-slate-400 line-through">
+                      ₹{formatInr(totalRegular)}
+                    </span>
+                  ) : null}
                   <span className="text-xs sm:text-sm font-bold text-[#673DE6]">
                     ₹{formatInr(finalPayable)}
                   </span>
@@ -770,7 +862,9 @@ export function CoworkingBookingModal({
                 Booking Confirmed!
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-sm mx-auto leading-relaxed">
-                Your Premium Membership and CoWorking Plan have been successfully booked.
+                {isRegular
+                  ? 'Your CoWorking Plan has been successfully booked.'
+                  : 'Your Premium Membership and CoWorking Plan have been successfully booked.'}
               </p>
             </div>
 
@@ -863,10 +957,12 @@ export function CoworkingBookingModal({
                   <span className="text-slate-700 font-medium">Regular Price (Total)</span>
                   <span className="text-slate-900 font-bold">₹{formatInr(totalRegular)}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs sm:text-sm">
-                  <span className="text-slate-700 font-medium">Discount (Total)</span>
-                  <span className="font-bold text-[#16A34A]">– ₹{formatInr(totalSavings)}</span>
-                </div>
+                {totalSavings > 0 && (
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-slate-700 font-medium">Discount (Total)</span>
+                    <span className="font-bold text-[#16A34A]">– ₹{formatInr(totalSavings)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Amount Paid Banner */}
@@ -880,15 +976,17 @@ export function CoworkingBookingModal({
               </div>
 
               {/* Total Savings Banner */}
-              <div className="rounded-2xl border border-green-200/80 bg-[#EAFBF0] py-2 px-3 sm:px-4 flex items-center justify-between shadow-2xs">
-                <div className="flex items-center gap-2 text-[#15803D]">
-                  <PiggyBank size={18} className="stroke-[2.2]" />
-                  <span className="text-xs sm:text-sm font-black">Total Savings</span>
+              {totalSavings > 0 && (
+                <div className="rounded-2xl border border-green-200/80 bg-[#EAFBF0] py-2 px-3 sm:px-4 flex items-center justify-between shadow-2xs">
+                  <div className="flex items-center gap-2 text-[#15803D]">
+                    <PiggyBank size={18} className="stroke-[2.2]" />
+                    <span className="text-xs sm:text-sm font-black">Total Savings</span>
+                  </div>
+                  <span className="rounded-full bg-[#15803D] text-white px-3 py-0.5 text-xs sm:text-sm font-black shadow-2xs">
+                    ₹{formatInr(totalSavings)}
+                  </span>
                 </div>
-                <span className="rounded-full bg-[#15803D] text-white px-3 py-0.5 text-xs sm:text-sm font-black shadow-2xs">
-                  ₹{formatInr(totalSavings)}
-                </span>
-              </div>
+              )}
             </div>
 
             {/* Bottom CTA: See My Bookings -> */}

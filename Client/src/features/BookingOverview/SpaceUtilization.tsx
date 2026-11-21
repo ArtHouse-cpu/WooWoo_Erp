@@ -360,7 +360,8 @@ export default function SpaceUtilizationPanel({
               </select>
             </div>
           </div>
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="min-w-[700px] w-full text-left text-xs whitespace-nowrap">
               <thead className="bg-purple-50/50 text-[10px] uppercase tracking-wide text-slate-500 font-bold">
                 <tr>
@@ -393,6 +394,59 @@ export default function SpaceUtilizationPanel({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card Form View */}
+          <div className="block sm:hidden p-2.5 space-y-2">
+            {visible.slice(0, 15).map((row, index) => (
+              <div
+                key={row.id}
+                className="rounded-2xl border border-purple-100/90 bg-white p-3 shadow-2xs space-y-2 hover:border-purple-200 transition"
+              >
+                {/* Header: Code + Category badge + Index */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-purple-50 border border-purple-100 text-[10px] font-bold text-[#673DE6]">
+                      #{index + 1}
+                    </span>
+                    <span className="font-extrabold text-xs text-slate-900 tracking-tight truncate">
+                      {row.bookingCode}
+                    </span>
+                  </div>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 border ${
+                      row.category === "Paid"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {row.category}
+                  </span>
+                </div>
+
+                {/* Main: Customer & Space */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="min-w-0">
+                    <span className="block text-[10px] font-medium text-slate-400">Customer</span>
+                    <p className="font-bold text-slate-800 truncate">{row.customerName || "—"}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-[10px] font-medium text-slate-400">Space</span>
+                    <p className="font-bold text-[#673DE6] truncate">{row.spaceName || "—"}</p>
+                  </div>
+                </div>
+
+                {/* Footer: Date, Hours, Total */}
+                <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                    <span>{pretty(row.bookingDate)}</span>
+                    <span>•</span>
+                    <span className="font-bold text-purple-700">{hoursLabel(row.durationHours)}</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">{inr(row.grandTotal)}</span>
+                </div>
+              </div>
+            ))}
           </div>
           {visible.length === 0 ? <p className="px-3 py-6 text-center text-xs text-slate-400">No bookings in this view.</p> : null}
         </article>

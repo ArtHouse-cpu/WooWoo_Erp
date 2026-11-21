@@ -14,12 +14,14 @@ import {
   Laptop,
   User,
   ChevronRight,
+  BadgeIndianRupee,
 } from 'lucide-react';
 import {toast} from 'sonner';
 import {SpaceDetailsModal, type SpaceDetailsModalState} from '../../components/spaces/SpaceDetailsModal';
 import {ShareSpaceModal} from '../../components/spaces/ShareSpaceModal';
 import {SpaceBookingModal} from '../../components/spaces/SpaceBookingModal';
 import {CoworkingBookingModal} from '../../components/spaces/CoworkingBookingModal';
+import {CoworkingRateCardModal} from '../../components/spaces/CoworkingRateCardModal';
 import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
   formatInr,
@@ -189,7 +191,19 @@ export default function SpacesMarketplacePage() {
   const [shareSpace, setShareSpace] = useState<SpaceCard | null>(null);
   const [bookingSpace, setBookingSpace] = useState<SpaceCard | null>(null);
   const [coworkingBookingSpace, setCoworkingBookingSpace] = useState<SpaceCard | null>(null);
+  const [showRateCardModal, setShowRateCardModal] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const qType = params.get('type') || params.get('tab') || '';
+    if (qType && (qType.toLowerCase() === 'coworking' || qType.toLowerCase() === 'exclusive')) {
+      setSpaceType(qType.charAt(0).toUpperCase() + qType.slice(1).toLowerCase());
+    }
+    if (params.get('ratecard') === 'true' || params.get('rateCard') === 'true') {
+      setShowRateCardModal(true);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     let restoreData: {
@@ -379,19 +393,32 @@ export default function SpacesMarketplacePage() {
       <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
         {spaceType.toLowerCase() === 'coworking' ? (
           <div>
-            {/* Header: Lavender square with Laptop icon + Coworking Spaces title & subtitle */}
-            <div className="flex items-center gap-3.5 mb-4 sm:mb-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F3E8FF] text-[#7C3AED]">
-                <Laptop size={22} className="stroke-[2.2]" />
+            {/* Header: Lavender square with Laptop icon + Coworking Spaces title & subtitle + Rate Card Button */}
+            <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+              <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+                <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F3E8FF] text-[#7C3AED] shadow-2xs">
+                  <Laptop size={22} className="stroke-[2.2]" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-display text-base sm:text-xl font-black text-[#111111] truncate">
+                    Coworking Spaces
+                  </h2>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-500 truncate">
+                    Flexible workspaces for individuals &amp; teams.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-display text-lg sm:text-xl font-black text-[#111111]">
-                  Coworking Spaces
-                </h2>
-                <p className="text-xs sm:text-sm font-semibold text-slate-500">
-                  Flexible workspaces for individuals &amp; teams.
-                </p>
-              </div>
+
+              {/* Rate Card Button */}
+              <button
+                type="button"
+                onClick={() => setShowRateCardModal(true)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-purple-200/90 bg-purple-50/90 hover:bg-purple-100/90 text-[#7C3AED] px-3 py-2 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-bold shadow-3xs transition hover:scale-98 active:scale-95 cursor-pointer"
+                title="View Coworking Rate Card"
+              >
+                <BadgeIndianRupee size={16} strokeWidth={2.2} />
+                <span>Rate Card</span>
+              </button>
             </div>
 
             {/* List of passes */}
@@ -659,6 +686,21 @@ export default function SpacesMarketplacePage() {
         isOpen={Boolean(coworkingBookingSpace)}
         onClose={() => setCoworkingBookingSpace(null)}
         space={coworkingBookingSpace}
+      />
+      <CoworkingRateCardModal
+        isOpen={showRateCardModal}
+        onClose={() => setShowRateCardModal(false)}
+        onSelectPass={passId => {
+          const matched =
+            coworkingList.find(
+              p =>
+                p.id.toLowerCase().includes(passId.toLowerCase()) ||
+                p.name.toLowerCase().includes(passId.toLowerCase()),
+            ) || coworkingList[0];
+          if (matched) {
+            setCoworkingBookingSpace(matched);
+          }
+        }}
       />
     </div>
   );

@@ -28,6 +28,7 @@ export default function OurProgramsPage({defaultTab}: OurProgramsPageProps) {
   return (
     <ProgramsBottomSheet
       isOpen
+      asPage
       initialTab={initialTab}
       onClose={handleClose}
     />

@@ -519,21 +519,30 @@ export function SpaceDetailsModal({
       isRestoredRef.current = false;
       return;
     }
-    const lower = (space.name || '').toLowerCase();
-    if (lower.includes('weekly')) {
-      setSelectedPlanId('weekly');
-    } else if (lower.includes('3 month')) {
-      setSelectedPlanId('3months');
-    } else if (lower.includes('6 month')) {
+    const lower = `${space.name || ''} ${space.id || ''}`.toLowerCase();
+    if (lower.includes('6 month') || lower.includes('6-month')) {
       setSelectedPlanId('6months');
-    } else if (lower.includes('monthly')) {
+    } else if (lower.includes('3 month') || lower.includes('3-month')) {
+      setSelectedPlanId('3months');
+    } else if (lower.includes('monthly') || lower.includes('month pass')) {
       setSelectedPlanId('monthly');
+    } else if (lower.includes('weekly') || lower.includes('week pass')) {
+      setSelectedPlanId('weekly');
     } else {
       setSelectedPlanId('day');
     }
     setSelectedPriceType('membership');
     setBookingPassOverride(null);
   }, [space]);
+
+  // When a particular coworking plan is chosen/opened, only show that plan in "Choose Your Plan"
+  const coworkingPlansToShow = useMemo(() => {
+    if (isCoworking && selectedPlanId) {
+      const single = COWORKING_PLANS.filter(p => p.id === selectedPlanId);
+      if (single.length > 0) return single;
+    }
+    return COWORKING_PLANS;
+  }, [isCoworking, selectedPlanId]);
 
   useEffect(() => {
     if (!initialState) return;
@@ -985,6 +994,16 @@ export function SpaceDetailsModal({
   const unitDiscount = Math.round(activePrice * discountRate);
   const finalUnitPrice = Math.max(0, activePrice - unitDiscount);
 
+  // Maximum discount and lowest price achievable with membership
+  const maxMembershipDiscountPercent = useMemo(() => {
+    return Math.max(...MEMBERSHIP_TIERS.map(t => t.discountPercent), 40);
+  }, []);
+
+  const lowestActiveMemberPrice = useMemo(() => {
+    const discount = Math.round(activePrice * (maxMembershipDiscountPercent / 100));
+    return Math.max(0, activePrice - discount);
+  }, [activePrice, maxMembershipDiscountPercent]);
+
   const handleShare = async () => {
     // Open share modal on mobile screen
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -1061,9 +1080,9 @@ export function SpaceDetailsModal({
             <h2
               id="space-details-title"
               className="truncate font-display text-xs min-[340px]:text-sm sm:text-xl md:text-2xl font-black text-[#111111] leading-tight"
-              title={isCoworking ? 'CoWorking Space' : space.name}
+              title={isCoworking ? (space.name || 'CoWorking Space') : space.name}
             >
-              {isCoworking ? 'CoWorking Space' : space.name}
+              {isCoworking ? (space.name || 'CoWorking Space') : space.name}
             </h2>
             <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full bg-[#F3E8FF] px-2 sm:px-3 py-0.5 sm:py-1 text-[10.5px] sm:text-xs font-bold text-[#7C3AED] shrink-0 whitespace-nowrap">
               <Users size={11} className="sm:w-[13px] sm:h-[13px] stroke-[2.5]" />
@@ -1306,7 +1325,7 @@ export function SpaceDetailsModal({
 
                       {/* Plans List */}
                       <div className="divide-y divide-purple-50/80">
-                        {COWORKING_PLANS.map(plan => {
+                        {coworkingPlansToShow.map(plan => {
                           const isPlanActive = selectedPlanId === plan.id;
                           const isRegularSelected = isPlanActive && selectedPriceType === 'regular';
                           const isMemberSelected = isPlanActive && selectedPriceType === 'membership';
@@ -1346,7 +1365,7 @@ export function SpaceDetailsModal({
                                   }}
                                   className={`flex items-center justify-center gap-1.5 w-[74px] sm:w-24 py-1 px-1 rounded-xl transition cursor-pointer select-none ${
                                     isRegularSelected
-                                      ? 'bg-purple-100/70 text-[#7C3AED]'
+                                      ? 'bg-purple-100 text-[#7C3AED] ring-1.5 ring-[#7C3AED]'
                                       : 'hover:bg-slate-100/80 text-slate-800'
                                   }`}
                                 >
@@ -1383,7 +1402,7 @@ export function SpaceDetailsModal({
                                   }}
                                   className={`flex items-center justify-center gap-1.5 w-[104px] sm:w-34 py-1 px-1 rounded-xl transition cursor-pointer select-none ${
                                     isMemberSelected
-                                      ? 'bg-purple-100/70 text-[#7C3AED]'
+                                      ? 'bg-purple-100 text-[#7C3AED] ring-1.5 ring-[#7C3AED]'
                                       : 'hover:bg-amber-50/70 text-[#854D0E]'
                                   }`}
                                 >
@@ -1872,8 +1891,36 @@ export function SpaceDetailsModal({
                 </div>
               </div>
 
+              {/* Lowest Price from Membership Banner (Directly above Weekday/Weekend selector) */}
+              <div
+                onClick={() => setIsDiscountsOpen(v => !v)}
+                className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/90 via-purple-50/40 to-white px-3.5 py-2.5 shadow-3xs cursor-pointer hover:border-amber-300 transition"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-xs">
+                    <Crown size={14} className="fill-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-700">Member Price:</span>
+                      <span className="text-xs sm:text-sm font-black text-[#6344E7]">
+                        From ₹{formatInr(lowestActiveMemberPrice)}
+                        <span className="text-[11px] font-bold text-slate-500"> / hr</span>
+                      </span>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9.5px] sm:text-[10px] font-black text-emerald-700">
+                        Up to {maxMembershipDiscountPercent}% OFF
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-[#6344E7] shrink-0">
+                  <span>{selectedTier ? selectedTier.name : 'View Discounts'}</span>
+                  <ChevronRight size={13} className="stroke-[2.5]" />
+                </div>
+              </div>
+
               {/* Weekday & Weekend Segmented Control & Price Display */}
-              <div className="flex items-center justify-between gap-3 pt-2">
+              <div className="flex items-center justify-between gap-3 pt-1">
                 <div className="inline-flex items-center rounded-full bg-slate-100 p-1">
                   <button
                     type="button"
@@ -1900,6 +1947,23 @@ export function SpaceDetailsModal({
                 </div>
 
                 <div className="text-right">
+                  {selectedTier ? (
+                    <div className="flex items-center justify-end gap-1.5 mb-0.5">
+                      <span className="text-xs font-semibold text-slate-400 line-through">
+                        ₹{formatInr(activePrice)}
+                      </span>
+                      <span className="rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 text-[10px] font-black text-emerald-700">
+                        {selectedTier.discountPercent}% OFF
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-end gap-1 mb-0.5">
+                      <Crown size={11} className="text-amber-500 fill-amber-500 shrink-0" />
+                      <span className="text-[10.5px] sm:text-[11px] font-semibold text-slate-500">From </span>
+                      <span className="text-[11px] sm:text-xs font-black text-[#6344E7]">₹{formatInr(lowestActiveMemberPrice)}</span>
+                      <span className="text-[10px] font-bold text-slate-400">/hr member</span>
+                    </div>
+                  )}
                   <div className="flex items-baseline justify-end gap-1">
                     <span className="text-2xl sm:text-3xl font-black text-[#6344E7] tracking-tight">
                       ₹{formatInr(finalUnitPrice || activePrice)}
@@ -2659,7 +2723,11 @@ export function SpaceDetailsModal({
             onClick={isCoworking ? handleBookCoworkingPlan : handleBook}
             className="flex-1 flex h-12 sm:h-13 items-center justify-center gap-2 rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] text-white text-base font-bold shadow-md shadow-purple-500/25 transition active:scale-95 cursor-pointer"
           >
-            <span>Book Now</span>
+            <span>
+              {isCoworking
+                ? `Book Now (${selectedPriceType === 'regular' ? 'Regular' : 'Premium'})`
+                : 'Book Now'}
+            </span>
           </button>
         </div>
       </div>
@@ -3151,6 +3219,7 @@ export function SpaceDetailsModal({
         space={space}
         initialPlanId={selectedPlanId}
         initialStartDate={selectedDate}
+        pricingType={selectedPriceType}
       />
 
       {/* Space Booking Terms Modal */}
