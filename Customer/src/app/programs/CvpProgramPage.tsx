@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft,
@@ -10,52 +10,176 @@ import {
   Headset,
   FileText,
   Clock,
-  Sparkles,
   Heart,
-  Gift,
-  Coffee,
   CheckCircle2,
-  Plus,
   MessageCircle,
   BookOpen,
-  Award,
+  IndianRupee,
+  Wallet,
+  TrendingUp,
+  CreditCard,
+  Search,
+  X,
+  Plus,
+  ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardSidebar } from "../../components/dashboard/DashboardSidebar";
-import { TopNavbar } from "../../components/dashboard/TopNavbar";
 import { CvpJoinModal } from "../../components/dashboard/CvpJoinModal";
 import { useCvpApplication } from "../../hooks/useCvpApplication";
 import { useAuthStore } from "../../store/authStore";
+import { authApi } from "../../services/auth.service";
+import type { WalletDashboard } from "../../types/auth";
 
 // ================= TYPES =================
-interface HoursLogEntry {
+export interface CvpEventEntry {
   id: string;
   eventName: string;
   date: string;
+  timeSlot?: string;
   hours: number;
   role: string;
+  stipend?: number;
   verifiedBy: string;
-  status: "Verified" | "Pending Review";
+  category?: "Workshop" | "Exhibition" | "Studio Jam" | "Flea Market" | "Community";
+  status: "Completed" | "Verified" | "Upcoming" | "Pending Review";
 }
 
-const INITIAL_HOURS_LOG: HoursLogEntry[] = [
+export interface CvpTimelineItem {
+  id: string;
+  type: "earning" | "payout";
+  title: string;
+  subtitle: string;
+  date: string;
+  amount: number;
+  status: "Completed" | "Pending" | "Processing";
+  isCredit: boolean;
+  reference?: string;
+}
+
+type TabType = "events" | "timeline" | "guidelines";
+type EventFilter = "all" | "completed" | "upcoming" | "workshops";
+type TimelineFilter = "all" | "earnings" | "payouts";
+
+const INITIAL_EVENTS: CvpEventEntry[] = [
   {
-    id: "log-1",
+    id: "evt-1",
     eventName: "Mini Terrarium Workshop Assist",
     date: "14 Nov 2026",
+    timeSlot: "Morning (9:30 AM – 1:00 PM)",
     hours: 3.5,
     role: "Material Coordinator",
+    stipend: 450,
     verifiedBy: "Studio Mentor (Priya)",
+    category: "Workshop",
     status: "Verified",
   },
   {
-    id: "log-2",
+    id: "evt-2",
     eventName: "Diwali Art House Flea & Exhibition",
     date: "08 Nov 2026",
+    timeSlot: "Full Shift (12:00 PM – 5:00 PM)",
     hours: 5.0,
     role: "Front Desk & Guest Welcome",
+    stipend: 650,
     verifiedBy: "Community Lead (Karan)",
+    category: "Exhibition",
     status: "Verified",
+  },
+  {
+    id: "evt-3",
+    eventName: "Weekend Pottery & Clay Studio Jam",
+    date: "02 Nov 2026",
+    timeSlot: "Afternoon (2:00 PM – 6:00 PM)",
+    hours: 4.0,
+    role: "Studio Prep & Glaze Assistant",
+    stipend: 500,
+    verifiedBy: "Pottery Master (Dev)",
+    category: "Studio Jam",
+    status: "Completed",
+  },
+  {
+    id: "evt-4",
+    eventName: "Children's Watercolor & Origami Camp",
+    date: "25 Oct 2026",
+    timeSlot: "Morning (10:00 AM – 2:00 PM)",
+    hours: 4.0,
+    role: "Child Safety & Activity Helper",
+    stipend: 500,
+    verifiedBy: "Lead Instructor (Ananya)",
+    category: "Community",
+    status: "Verified",
+  },
+  {
+    id: "evt-5",
+    eventName: "Live Acoustic Night & Canvas Showcase",
+    date: "28 Nov 2026",
+    timeSlot: "Evening (6:00 PM – 10:00 PM)",
+    hours: 4.0,
+    role: "Stage Setup & Registration Desk",
+    stipend: 550,
+    verifiedBy: "Studio Coordinator",
+    category: "Exhibition",
+    status: "Upcoming",
+  },
+];
+
+const INITIAL_TIMELINE: CvpTimelineItem[] = [
+  {
+    id: "tl-cvp-1",
+    type: "earning",
+    title: "Volunteer Stipend · Mini Terrarium Workshop",
+    subtitle: "Shift ref #CVP-4019 · 3.5 hrs verified",
+    date: "14 Nov 2026, 2:30 PM",
+    amount: 450,
+    isCredit: true,
+    status: "Completed",
+    reference: "TXN-902814",
+  },
+  {
+    id: "tl-cvp-2",
+    type: "payout",
+    title: "Stipend Disbursed to Bank Account",
+    subtitle: "Direct IMPS Bank Transfer",
+    date: "10 Nov 2026, 11:45 AM",
+    amount: 1150,
+    isCredit: false,
+    status: "Completed",
+    reference: "UTR-HDFC8890231",
+  },
+  {
+    id: "tl-cvp-3",
+    type: "earning",
+    title: "Volunteer Stipend · Diwali Art Flea",
+    subtitle: "Shift ref #CVP-3910 · 5.0 hrs verified",
+    date: "08 Nov 2026, 6:15 PM",
+    amount: 650,
+    isCredit: true,
+    status: "Completed",
+    reference: "TXN-884102",
+  },
+  {
+    id: "tl-cvp-4",
+    type: "earning",
+    title: "Volunteer Stipend · Pottery Studio Jam",
+    subtitle: "Shift ref #CVP-3801 · 4.0 hrs verified",
+    date: "02 Nov 2026, 7:00 PM",
+    amount: 500,
+    isCredit: true,
+    status: "Completed",
+    reference: "TXN-869201",
+  },
+  {
+    id: "tl-cvp-5",
+    type: "payout",
+    title: "Stipend Disbursed to UPI / Bank Account",
+    subtitle: "UPI Payout Transfer",
+    date: "28 Oct 2026, 4:20 PM",
+    amount: 500,
+    isCredit: false,
+    status: "Completed",
+    reference: "UPI-40928172910",
   },
 ];
 
@@ -69,15 +193,22 @@ export default function CvpProgramPage() {
   const [timeFilter, setTimeFilter] = useState("Lifetime");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"hours" | "perks" | "handbook">("hours");
-  const [hoursLog, setHoursLog] = useState<HoursLogEntry[]>(INITIAL_HOURS_LOG);
+  const [activeTab, setActiveTab] = useState<TabType>("events");
+  const [eventFilter, setEventFilter] = useState<EventFilter>("all");
+  const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showLogModal, setShowLogModal] = useState(false);
+
+  const [events, setEvents] = useState<CvpEventEntry[]>(INITIAL_EVENTS);
+  const [timeline, setTimeline] = useState<CvpTimelineItem[]>(INITIAL_TIMELINE);
+  const [walletData, setWalletData] = useState<WalletDashboard | null>(null);
 
   // Form for logging hours
   const [newLogEvent, setNewLogEvent] = useState("");
   const [newLogDate, setNewLogDate] = useState("");
   const [newLogHours, setNewLogHours] = useState("3");
   const [newLogRole, setNewLogRole] = useState("");
+  const [newLogStipend, setNewLogStipend] = useState("");
 
   const timeOptions = ["Lifetime", "Today", "This Week", "This Month", "This Year"];
 
@@ -87,6 +218,61 @@ export default function CvpProgramPage() {
       : "Hi, I need assistance with the Community Volunteering Program (CVP) at Woo Woo Art House."
   )}`;
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authApi.getWalletDashboard();
+        if (!cancelled && res.data.success && res.data.data) {
+          setWalletData(res.data.data);
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Aggregates for the 4 KPIs
+  const totalEvents = events.filter((e) => e.status !== "Pending Review").length;
+  const totalHours = events.reduce((sum, e) => sum + (e.hours || 0), 0);
+  const totalEarnings =
+    walletData?.affiliateThisMonth?.earnings ??
+    timeline.filter((t) => t.isCredit).reduce((sum, t) => sum + t.amount, 0);
+  const totalPayouts =
+    walletData?.balances?.withdrawable ??
+    timeline.filter((t) => !t.isCredit).reduce((sum, t) => sum + t.amount, 0);
+
+  // Filtered Events
+  const filteredEvents = useMemo(() => {
+    return events.filter((e) => {
+      if (eventFilter === "completed" && e.status !== "Completed" && e.status !== "Verified") return false;
+      if (eventFilter === "upcoming" && e.status !== "Upcoming") return false;
+      if (eventFilter === "workshops" && e.category !== "Workshop") return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          e.eventName.toLowerCase().includes(q) ||
+          e.role.toLowerCase().includes(q) ||
+          e.verifiedBy.toLowerCase().includes(q) ||
+          (e.category && e.category.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [events, eventFilter, searchQuery]);
+
+  // Filtered Timeline
+  const filteredTimeline = useMemo(() => {
+    return timeline.filter((t) => {
+      if (timelineFilter === "earnings" && !t.isCredit) return false;
+      if (timelineFilter === "payouts" && t.isCredit) return false;
+      return true;
+    });
+  }, [timeline, timelineFilter]);
+
   // Submit manual log entry
   const handleSubmitHours = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,31 +280,44 @@ export default function CvpProgramPage() {
       toast.error("Please fill in event name, date and hours.");
       return;
     }
-    const newEntry: HoursLogEntry = {
+    const hrs = Number(newLogHours) || 1;
+    const stp = Number(newLogStipend) || 0;
+    const newEntry: CvpEventEntry = {
       id: `log-${Date.now()}`,
       eventName: newLogEvent,
       date: newLogDate,
-      hours: Number(newLogHours) || 1,
+      hours: hrs,
       role: newLogRole || "Volunteer",
+      stipend: stp > 0 ? stp : undefined,
       verifiedBy: "Pending Coordinator Review",
+      category: "Workshop",
       status: "Pending Review",
     };
-    setHoursLog((prev) => [newEntry, ...prev]);
+    setEvents((prev) => [newEntry, ...prev]);
+    if (stp > 0) {
+      setTimeline((prev) => [
+        {
+          id: `tl-${Date.now()}`,
+          type: "earning",
+          title: `Stipend Claim · ${newLogEvent}`,
+          subtitle: `Manual log · ${hrs} hrs submitted for review`,
+          date: "Just now",
+          amount: stp,
+          isCredit: true,
+          status: "Pending",
+          reference: `LOG-${Date.now().toString().slice(-6)}`,
+        },
+        ...prev,
+      ]);
+    }
     toast.success("Hours logged! Submitted to studio coordinator for review.");
     setShowLogModal(false);
     setNewLogEvent("");
     setNewLogDate("");
     setNewLogHours("3");
     setNewLogRole("");
+    setNewLogStipend("");
   };
-
-  // Aggregates
-  const totalVerifiedHours = hoursLog
-    .filter((h) => h.status === "Verified")
-    .reduce((sum, h) => sum + h.hours, 0);
-  const totalEventsSupported = hoursLog.filter((h) => h.status === "Verified").length;
-  const studioCreditsEarned = Math.floor(totalVerifiedHours / 2);
-  const impactPoints = Math.round(totalVerifiedHours * 20);
 
   // Unapproved or unsubmitted states
   if (!loaded || (!application && !customer?._id)) {
@@ -129,11 +328,10 @@ export default function CvpProgramPage() {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <div className="mx-auto max-w-[1440px] p-4 md:p-6">
+        <div className="mx-auto max-w-[1440px] p-2.5 sm:p-4 md:p-6">
           <div className="hidden gap-6 xl:flex">
             <DashboardSidebar mode="fixed" />
             <div className="min-w-0 flex-1 space-y-6">
-              <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
               <CvpAccessCard
                 loaded={loaded}
                 status={application?.status}
@@ -143,8 +341,7 @@ export default function CvpProgramPage() {
             </div>
           </div>
           <div className="xl:hidden">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
-            <div className="mt-4">
+            <div className="pb-6">
               <CvpAccessCard
                 loaded={loaded}
                 status={application?.status}
@@ -172,28 +369,28 @@ export default function CvpProgramPage() {
 
   const content = (
     <div className="w-full space-y-6 pb-12">
-      <div className="overflow-visible rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)] sm:p-6 md:p-8">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-3.5 sm:p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
 
         {/* ================= HEADER ================= */}
-        <div className="mb-6 flex flex-nowrap items-center justify-between gap-2 border-b border-gray-100 pb-5 sm:gap-3">
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="mb-5 sm:mb-6 flex items-center justify-between gap-1.5 sm:gap-3 border-b border-gray-100 pb-4 sm:pb-5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
-              aria-label="Go back"
+              onClick={() => navigate('/ourprograms?tab=cvp')}
+              className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+              aria-label="Go back to CVP Programs"
             >
-              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
 
-            <div className="shrink-0">
+            <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <h1 className="whitespace-nowrap text-[17px] font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
+                <h1 className="truncate text-base sm:text-2xl md:text-3xl font-black tracking-tight text-[#0f172a]">
                   CVP Program
                 </h1>
                 {/* 3 diagonal emerald spark dashes */}
                 <svg
-                  className="h-4 w-4 -mt-2 shrink-0 text-[#059669] sm:h-5 sm:w-5"
+                  className="h-3.5 w-3.5 sm:h-5 sm:w-5 -mt-1 shrink-0 text-[#059669]"
                   viewBox="0 0 16 16"
                   fill="none"
                   stroke="currentColor"
@@ -206,28 +403,28 @@ export default function CvpProgramPage() {
                 </svg>
               </div>
 
-              <p className="whitespace-nowrap text-[11px] font-semibold text-[#94a3b8] sm:text-sm">
+              <p className="truncate text-[10px] sm:text-xs font-semibold text-[#94a3b8]">
                 Community Volunteering Program
               </p>
             </div>
           </div>
 
           {/* Right Controls: Filter + More */}
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {/* Filter Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setFilterDropdownOpen((v) => !v)}
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white px-2.5 py-2 text-[11px] font-bold text-gray-700 shadow-sm transition hover:bg-gray-50 sm:gap-2 sm:px-3.5 sm:text-xs cursor-pointer"
+                className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-gray-200/90 bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-[10.5px] sm:text-xs font-bold text-gray-700 shadow-xs transition hover:bg-gray-50 cursor-pointer shrink-0"
               >
-                <Calendar size={15} className="text-gray-500" />
-                <span>{timeFilter}</span>
-                <ChevronDown size={14} className="text-gray-400" />
+                <Calendar size={13} className="text-gray-500 shrink-0" />
+                <span className="truncate max-w-[55px] sm:max-w-none">{timeFilter}</span>
+                <ChevronDown size={13} className="text-gray-400 shrink-0" />
               </button>
 
               {filterDropdownOpen && (
-                <div className="absolute right-0 top-11 z-30 w-40 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
+                <div className="absolute right-0 top-10 sm:top-11 z-30 w-36 sm:w-40 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
                   {timeOptions.map((opt) => (
                     <button
                       key={opt}
@@ -236,7 +433,7 @@ export default function CvpProgramPage() {
                         setTimeFilter(opt);
                         setFilterDropdownOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium transition cursor-pointer ${
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-left text-xs font-medium transition cursor-pointer ${
                         timeFilter === opt
                           ? "bg-emerald-50 text-emerald-700 font-bold"
                           : "text-gray-700 hover:bg-gray-50"
@@ -255,16 +452,16 @@ export default function CvpProgramPage() {
               <button
                 type="button"
                 onClick={() => setMenuDropdownOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/90 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 cursor-pointer"
+                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-gray-200/90 bg-white text-gray-600 shadow-xs transition hover:bg-gray-50 cursor-pointer shrink-0"
                 aria-label="More options"
               >
-                <MoreVertical size={18} />
+                <MoreVertical size={16} />
               </button>
 
               {menuDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setMenuDropdownOpen(false)} />
-                  <div className="absolute right-0 top-11 z-40 w-44 rounded-2xl border border-gray-100 bg-white p-2 shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
+                  <div className="absolute right-0 top-10 sm:top-11 z-40 w-44 rounded-2xl border border-gray-100 bg-white p-2 shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
                     <button
                       type="button"
                       onClick={() => {
@@ -293,7 +490,7 @@ export default function CvpProgramPage() {
                       type="button"
                       onClick={() => {
                         setMenuDropdownOpen(false);
-                        navigate("/communityguidelines");
+                        setActiveTab("guidelines");
                       }}
                       className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 cursor-pointer"
                     >
@@ -307,359 +504,527 @@ export default function CvpProgramPage() {
           </div>
         </div>
 
-        {/* ================= 6 STAT CARDS (AT TOP DIRECTLY UNDER HEADER) ================= */}
-        <div className="mb-5 grid grid-cols-3 gap-1.5 sm:mb-8 sm:gap-4 lg:grid-cols-6">
-          {/* Card 1: Hours Volunteered */}
-          <div className="flex flex-col justify-between rounded-xl border border-[#D1FAE5]/80 bg-[#ECFDF5] p-2 transition hover:shadow-sm sm:rounded-2xl sm:p-3.5">
-            <div className="flex items-start gap-1 sm:gap-2.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-100/90 text-[#059669] sm:h-8 sm:w-8 sm:rounded-xl">
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
+        {/* ================= 4 STAT CARDS (KPIS: Events, Hours, Earnings, Payouts) ================= */}
+        <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
+          {/* Card 1: Events */}
+          <div className="flex flex-col justify-between rounded-xl border border-[#CCFBF1]/90 bg-[#F0FDFA] p-3 transition hover:shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="flex items-start gap-2 sm:gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-700 sm:h-9 sm:w-9 sm:rounded-xl">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
               </div>
-              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
-                Hours Contributed
-              </span>
-            </div>
-            <div className="mt-1.5 sm:mt-3">
-              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">
-                {totalVerifiedHours}h
-              </p>
-              <span className="mt-1 hidden text-[10px] font-medium text-emerald-700 sm:mt-1.5 sm:block sm:text-[11px]">
-                Verified by mentor
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: Events Supported */}
-          <div className="flex flex-col justify-between rounded-xl border border-[#CCFBF1]/80 bg-[#F0FDFA] p-2 transition hover:shadow-sm sm:rounded-2xl sm:p-3.5">
-            <div className="flex items-start gap-1 sm:gap-2.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-teal-100/90 text-teal-700 sm:h-8 sm:w-8 sm:rounded-xl">
-                <Calendar className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
-              </div>
-              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
-                Events Supported
-              </span>
-            </div>
-            <div className="mt-1.5 sm:mt-3">
-              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">
-                {totalEventsSupported}
-              </p>
-              <span className="mt-1 hidden text-[10px] font-medium text-teal-700 sm:mt-1.5 sm:block sm:text-[11px]">
-                Art & workshop jams
-              </span>
-            </div>
-          </div>
-
-          {/* Card 3: Studio Credits */}
-          <div className="flex flex-col justify-between rounded-xl border border-[#FEF3C7]/80 bg-[#FFFBEB] p-2 transition hover:shadow-sm sm:rounded-2xl sm:p-3.5">
-            <div className="flex items-start gap-1 sm:gap-2.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 sm:h-8 sm:w-8 sm:rounded-xl">
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
-              </div>
-              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
-                Studio Credits
-              </span>
-            </div>
-            <div className="mt-1.5 sm:mt-3">
-              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">
-                {studioCreditsEarned}h
-              </p>
-              <span className="mt-1 hidden text-[10px] font-medium text-amber-700 sm:mt-1.5 sm:block sm:text-[11px]">
-                Free studio access
-              </span>
-            </div>
-          </div>
-
-          {/* Card 4: Impact Score */}
-          <div className="flex flex-col justify-between rounded-xl border border-[#FFE4E6]/80 bg-[#FFF1F2] p-2 transition hover:shadow-sm sm:rounded-2xl sm:p-3.5">
-            <div className="flex items-start gap-1 sm:gap-2.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-rose-100/90 text-rose-600 sm:h-8 sm:w-8 sm:rounded-xl">
-                <Heart className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
-              </div>
-              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
-                Impact Score
-              </span>
-            </div>
-            <div className="mt-1.5 sm:mt-3">
-              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">{impactPoints} pts</p>
-              <span className="mt-1 hidden text-[10px] font-medium text-rose-600 sm:mt-1.5 sm:block sm:text-[11px]">
-                Community karma
-              </span>
-            </div>
-          </div>
-
-          {/* Card 5: Badges Earned */}
-          <div className="flex flex-col justify-between rounded-xl border border-[#EDE9FE]/80 bg-[#FAF5FF] p-2 transition hover:shadow-sm sm:rounded-2xl sm:p-3.5">
-            <div className="flex items-start gap-1 sm:gap-2.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-purple-100/90 text-purple-700 sm:h-8 sm:w-8 sm:rounded-xl">
-                <Award className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
-              </div>
-              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
-                Badges
-              </span>
-            </div>
-            <div className="mt-1.5 sm:mt-3">
-              <p className="text-sm font-black leading-none text-purple-700 sm:text-xl">2</p>
-              <span className="mt-1 hidden text-[10px] font-medium text-purple-600 sm:mt-1.5 sm:block sm:text-[11px]">
-                Art Angel & Helper
-              </span>
-            </div>
-          </div>
-
-          {/* Card 6: History */}
-          <div className="flex flex-col justify-between rounded-xl border sm:rounded-2xl border-[#E9EBEF]/80 bg-[#F6F7F9] p-2 transition hover:shadow-sm sm:p-3.5">
-            <div className="flex items-start gap-1 sm:gap-2.5">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-xl bg-slate-200/90 text-slate-700">
-                <FileText className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
-              </div>
-              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
-                History
-              </span>
-            </div>
-            <div className="mt-1.5 sm:mt-3">
-              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">{hoursLog.length}</p>
-              <span className="mt-1 hidden text-[10px] font-medium text-gray-400 sm:mt-1.5 sm:block sm:text-[11px]">
-                Total sessions
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ================= HORIZONTAL TABS ================= */}
-        <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-5 sm:gap-10">
-            {/* Hours Log Tab */}
-            <button
-              type="button"
-              onClick={() => setActiveTab("hours")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
-                activeTab === "hours"
-                  ? "text-[#059669]"
-                  : "text-gray-400 hover:text-gray-700"
-              }`}
-            >
-              <Clock size={18} strokeWidth={activeTab === "hours" ? 2.5 : 2} />
-              <span>Hours Log</span>
-            </button>
-
-            {/* Perks & Credits Tab */}
-            <button
-              type="button"
-              onClick={() => setActiveTab("perks")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
-                activeTab === "perks"
-                  ? "text-[#059669]"
-                  : "text-gray-400 hover:text-gray-700"
-              }`}
-            >
-              <Gift size={18} strokeWidth={activeTab === "perks" ? 2.5 : 2} />
-              <span>Credits & Perks</span>
-            </button>
-
-            {/* Handbook Tab */}
-            <button
-              type="button"
-              onClick={() => setActiveTab("handbook")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
-                activeTab === "handbook"
-                  ? "text-[#059669]"
-                  : "text-gray-400 hover:text-gray-700"
-              }`}
-            >
-              <BookOpen size={18} strokeWidth={activeTab === "handbook" ? 2.5 : 2} />
-              <span>Handbook & Guidelines</span>
-            </button>
-          </div>
-        </div>
-
-        {/* ================= TAB 1: HOURS LOG ================= */}
-        {activeTab === "hours" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h4 className="text-sm font-black text-slate-900">Volunteer Hours Activity</h4>
-                <p className="text-xs text-slate-500">Every 2 verified hours gives you 1 free studio pass credit</p>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800/80 sm:text-xs">
+                  Events
+                </span>
+                <span className="hidden sm:block text-[11px] text-teal-700/80 font-medium">Supported / shifts</span>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowLogModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#059669] px-4 py-2 text-xs font-bold text-white hover:bg-[#047857] shadow-xs cursor-pointer self-start sm:self-auto"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Log Self Hours</span>
-              </button>
             </div>
-
-            <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50/75 text-slate-500 font-bold">
-                  <tr>
-                    <th className="px-4 py-3">Event / Task</th>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Hours</th>
-                    <th className="px-4 py-3">Verified By</th>
-                    <th className="px-4 py-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {hoursLog.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50/50 transition">
-                      <td className="px-4 py-3.5 font-bold text-slate-900">{log.eventName}</td>
-                      <td className="px-4 py-3.5 text-slate-600">{log.date}</td>
-                      <td className="px-4 py-3.5 text-slate-600">{log.role}</td>
-                      <td className="px-4 py-3.5 font-black text-emerald-700">{log.hours} hrs</td>
-                      <td className="px-4 py-3.5 text-slate-500">{log.verifiedBy}</td>
-                      <td className="px-4 py-3.5 text-right">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                            log.status === "Verified"
-                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                              : "bg-amber-50 text-amber-800 border border-amber-200"
-                          }`}
-                        >
-                          {log.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-2.5 sm:mt-3.5">
+              <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
+                {totalEvents}
+              </p>
+              <span className="mt-1 block text-[10px] sm:text-[11px] font-semibold text-teal-700">
+                Workshops & exhibitions
+              </span>
             </div>
           </div>
-        )}
 
-        {/* ================= TAB 2: CREDITS & PERKS ================= */}
-        {activeTab === "perks" && (
-          <div className="space-y-6">
-            {/* Credit Balance Card */}
-            <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-[#F0FDF4] to-white p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                    Studio Credit Balance
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-black text-slate-900">{studioCreditsEarned} Hours</span>
-                    <span className="text-xs text-slate-500">Free studio & desk access</span>
-                  </div>
+          {/* Card 2: Hours */}
+          <div className="flex flex-col justify-between rounded-xl border border-[#D1FAE5]/90 bg-[#ECFDF5] p-3 transition hover:shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="flex items-start gap-2 sm:gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-[#059669] sm:h-9 sm:w-9 sm:rounded-xl">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800/80 sm:text-xs">
+                  Hours
+                </span>
+                <span className="hidden sm:block text-[11px] text-emerald-700/80 font-medium">Volunteered</span>
+              </div>
+            </div>
+            <div className="mt-2.5 sm:mt-3.5">
+              <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
+                {totalHours}h
+              </p>
+              <span className="mt-1 block text-[10px] sm:text-[11px] font-semibold text-emerald-700">
+                Verified contributions
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: Earnings */}
+          <div className="flex flex-col justify-between rounded-xl border border-[#FEF3C7]/90 bg-[#FFFBEB] p-3 transition hover:shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="flex items-start gap-2 sm:gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 sm:h-9 sm:w-9 sm:rounded-xl">
+                <IndianRupee className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800/80 sm:text-xs">
+                  Earnings
+                </span>
+                <span className="hidden sm:block text-[11px] text-amber-700/80 font-medium">Stipends earned</span>
+              </div>
+            </div>
+            <div className="mt-2.5 sm:mt-3.5">
+              <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
+                ₹{totalEarnings.toLocaleString("en-IN")}
+              </p>
+              <span className="mt-1 block text-[10px] sm:text-[11px] font-semibold text-amber-700">
+                Credited to wallet
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Payouts */}
+          <div className="flex flex-col justify-between rounded-xl border border-[#E0E7FF]/90 bg-[#F5F7FF] p-3 transition hover:shadow-sm sm:rounded-2xl sm:p-4">
+            <div className="flex items-start gap-2 sm:gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 sm:h-9 sm:w-9 sm:rounded-xl">
+                <Wallet className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800/80 sm:text-xs">
+                  Payouts
+                </span>
+                <span className="hidden sm:block text-[11px] text-indigo-700/80 font-medium">Disbursed</span>
+              </div>
+            </div>
+            <div className="mt-2.5 sm:mt-3.5">
+              <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
+                ₹{totalPayouts.toLocaleString("en-IN")}
+              </p>
+              <span className="mt-1 block text-[10px] sm:text-[11px] font-semibold text-indigo-700">
+                Withdrawn to bank
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ================= HORIZONTAL TABS (Events | Timeline | Guidelines) ================= */}
+        <div className="mb-6 border-b border-gray-100 pb-3 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-6 sm:gap-10 min-w-max whitespace-nowrap">
+            {/* Tab 1: Events */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("events")}
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer pb-1 ${
+                activeTab === "events"
+                  ? "text-[#059669] border-b-2 border-[#059669]"
+                  : "text-gray-400 hover:text-gray-700"
+              }`}
+            >
+              <Calendar size={18} strokeWidth={activeTab === "events" ? 2.5 : 2} className="shrink-0" />
+              <span>Events</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
+                {events.length}
+              </span>
+            </button>
+
+            {/* Tab 2: Timeline */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("timeline")}
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer pb-1 ${
+                activeTab === "timeline"
+                  ? "text-[#059669] border-b-2 border-[#059669]"
+                  : "text-gray-400 hover:text-gray-700"
+              }`}
+            >
+              <Clock size={18} strokeWidth={activeTab === "timeline" ? 2.5 : 2} className="shrink-0" />
+              <span>Timeline</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                {timeline.length}
+              </span>
+            </button>
+
+            {/* Tab 3: Guidelines */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("guidelines")}
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer pb-1 ${
+                activeTab === "guidelines"
+                  ? "text-[#059669] border-b-2 border-[#059669]"
+                  : "text-gray-400 hover:text-gray-700"
+              }`}
+            >
+              <BookOpen size={18} strokeWidth={activeTab === "guidelines" ? 2.5 : 2} className="shrink-0" />
+              <span>Guidelines</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ================= TAB 1: EVENTS ================= */}
+        {activeTab === "events" && (
+          <div className="space-y-4">
+            {/* Sub-category Filter Buttons + Search + Log Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {[
+                  { id: "all", label: "All Events", count: events.length },
+                  {
+                    id: "completed",
+                    label: "Completed",
+                    count: events.filter((e) => e.status === "Completed" || e.status === "Verified").length,
+                  },
+                  {
+                    id: "upcoming",
+                    label: "Upcoming",
+                    count: events.filter((e) => e.status === "Upcoming").length,
+                  },
+                  {
+                    id: "workshops",
+                    label: "Workshops",
+                    count: events.filter((e) => e.category === "Workshop").length,
+                  },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setEventFilter(cat.id as EventFilter)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      eventFilter === cat.id
+                        ? "bg-[#059669] text-white shadow-xs"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200/80 hover:text-gray-900"
+                    }`}
+                  >
+                    <span>{cat.label}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                        eventFilter === cat.id
+                          ? "bg-white/20 text-white"
+                          : "bg-gray-200 text-gray-600"
+                      }`}
+                    >
+                      {cat.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar + Log Hours Action */}
+              <div className="flex items-center gap-2">
+                <div className="relative w-full sm:w-56 shrink-0">
+                  <Search
+                    size={15}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search events..."
+                    className="w-full rounded-xl border border-gray-200/90 bg-gray-50/60 py-1.5 pl-8.5 pr-7 text-xs font-medium text-gray-900 outline-none transition focus:border-emerald-500 focus:bg-white"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => toast.success("Pass booked! Show this to front desk on your next visit.")}
-                  className="rounded-xl bg-[#059669] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#047857] shadow-xs active:scale-98 cursor-pointer"
+                  onClick={() => setShowLogModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-[#059669] px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#047857] active:scale-95 cursor-pointer shrink-0"
                 >
-                  Redeem Free Studio Pass
+                  <Plus size={14} className="stroke-[2.5]" />
+                  <span>Log Hours</span>
                 </button>
               </div>
             </div>
 
-            {/* Redeemable Perks Grid */}
-            <div>
-              <h4 className="text-sm font-black text-slate-900 mb-3">Redeemable Volunteer Rewards</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Perk 1 */}
-                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-2xs">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 mb-3">
-                    <Sparkles className="h-5 w-5" />
-                  </div>
-                  <h5 className="text-xs font-black text-slate-900">Studio Pass (2 Hours)</h5>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Enjoy unrestricted access to painting easel, co-working desk, and art library.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => toast.success("Studio pass claimed!")}
-                    className="mt-4 w-full rounded-xl border border-emerald-200 bg-emerald-50 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 cursor-pointer"
-                  >
-                    Redeem (4 Credits)
-                  </button>
-                </div>
-
-                {/* Perk 2 */}
-                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-2xs">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100 text-teal-700 mb-3">
-                    <Coffee className="h-5 w-5" />
-                  </div>
-                  <h5 className="text-xs font-black text-slate-900">Artisan Cafe Beverage</h5>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Complimentary iced latte, hot cappuccino or herbal tea at the Woo Woo Cafe.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => toast.success("Drink voucher claimed! Check your WhatsApp.")}
-                    className="mt-4 w-full rounded-xl border border-teal-200 bg-teal-50 py-2 text-xs font-bold text-teal-800 hover:bg-teal-100 cursor-pointer"
-                  >
-                    Claim Voucher
-                  </button>
-                </div>
-
-                {/* Perk 3 */}
-                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-2xs">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-700 mb-3">
-                    <Award className="h-5 w-5" />
-                  </div>
-                  <h5 className="text-xs font-black text-slate-900">Volunteer Certificate</h5>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Official digital Certificate of Appreciation signed by the art house director.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => toast.info("Certificate requested. It will be emailed to you.")}
-                    className="mt-4 w-full rounded-xl border border-purple-200 bg-purple-50 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 cursor-pointer"
-                  >
-                    Request Certificate
-                  </button>
-                </div>
+            {/* Events List */}
+            {filteredEvents.length === 0 ? (
+              <div className="rounded-2xl border border-gray-200/80 bg-white py-12 text-center shadow-xs">
+                <Calendar size={36} className="mx-auto text-gray-300" />
+                <p className="mt-2 text-sm font-bold text-gray-800">No events found</p>
+                <p className="mt-1 text-xs text-gray-400 max-w-sm mx-auto">
+                  Volunteer events and workshop shifts will appear here once registered or completed.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white shadow-xs overflow-hidden">
+                {filteredEvents.map((evt) => (
+                  <div
+                    key={evt.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 hover:bg-gray-50/60 transition"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-teal-100 bg-teal-50 text-teal-700">
+                        <Calendar size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs sm:text-sm font-bold text-gray-900 leading-snug">
+                            {evt.eventName}
+                          </p>
+                          {evt.category && (
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                              {evt.category}
+                            </span>
+                          )}
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              evt.status === "Verified" || evt.status === "Completed"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : evt.status === "Upcoming"
+                                ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {evt.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500 font-medium">
+                          <span>{evt.date}</span>
+                          {evt.timeSlot && (
+                            <>
+                              <span>•</span>
+                              <span>{evt.timeSlot}</span>
+                            </>
+                          )}
+                          <span>•</span>
+                          <span className="font-semibold text-slate-700">{evt.role}</span>
+                          <span>•</span>
+                          <span className="text-gray-400">{evt.verifiedBy}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-gray-100 pt-2 sm:pt-0 shrink-0 gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700">
+                          {evt.hours} hrs
+                        </span>
+                        {evt.stipend !== undefined && (
+                          <span className="text-xs sm:text-sm font-black text-emerald-600">
+                            +₹{evt.stipend.toLocaleString("en-IN")}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-semibold text-gray-400">
+                        {evt.stipend ? "Stipend Earned" : "Volunteer Credit"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* ================= TAB 3: HANDBOOK & GUIDELINES ================= */}
-        {activeTab === "handbook" && (
+        {/* ================= TAB 2: TIMELINE (earnings & payouts) ================= */}
+        {activeTab === "timeline" && (
+          <div className="space-y-4">
+            {/* Sub-category Filter Buttons */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {[
+                { id: "all", label: "All Activity", count: timeline.length },
+                {
+                  id: "earnings",
+                  label: "Earnings Only",
+                  count: timeline.filter((t) => t.isCredit).length,
+                },
+                {
+                  id: "payouts",
+                  label: "Payouts Only",
+                  count: timeline.filter((t) => !t.isCredit).length,
+                },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setTimelineFilter(cat.id as TimelineFilter)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    timelineFilter === cat.id
+                      ? "bg-[#059669] text-white shadow-xs"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200/80 hover:text-gray-900"
+                  }`}
+                >
+                  <span>{cat.label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                      timelineFilter === cat.id
+                        ? "bg-white/20 text-white"
+                        : "bg-gray-200 text-gray-600"
+                    }`}
+                  >
+                    {cat.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Timeline List */}
+            {filteredTimeline.length === 0 ? (
+              <div className="rounded-2xl border border-gray-200/80 bg-white py-12 text-center shadow-xs">
+                <Clock size={36} className="mx-auto text-gray-300" />
+                <p className="mt-2 text-sm font-bold text-gray-800">No timeline entries found</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  Volunteering stipends and payout disbursements will be recorded here over time.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white shadow-xs overflow-hidden">
+                {filteredTimeline.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 p-3.5 sm:p-4 hover:bg-gray-50/60 transition"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                          item.isCredit
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                            : "bg-blue-50 text-blue-600 border-blue-100"
+                        }`}
+                      >
+                        {item.isCredit ? <TrendingUp size={18} /> : <CreditCard size={18} />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs sm:text-sm font-bold text-gray-900 leading-snug">
+                            {item.title}
+                          </p>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              item.status === "Completed"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : item.status === "Processing"
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-500 font-medium">
+                          <span className="truncate">{item.subtitle}</span>
+                          {item.reference && (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono text-gray-400">{item.reference}</span>
+                            </>
+                          )}
+                          <span>•</span>
+                          <span className="text-gray-400">{item.date}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <p
+                        className={`text-sm sm:text-base font-black ${
+                          item.isCredit ? "text-emerald-600" : "text-slate-900"
+                        }`}
+                      >
+                        {item.isCredit ? "+" : "-"}₹{item.amount.toLocaleString("en-IN")}
+                      </p>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        {item.isCredit ? "Earning" : "Payout"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================= TAB 3: GUIDELINES ================= */}
+        {activeTab === "guidelines" && (
           <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-2xs">
-              <h4 className="text-sm font-black text-slate-900 mb-2">Volunteer Code of Conduct</h4>
-              <ul className="space-y-3 text-xs text-slate-600 leading-relaxed">
+            {/* Volunteer Code of Conduct */}
+            <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-6 shadow-2xs">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                <h4 className="text-sm sm:text-base font-black text-slate-900">Volunteer Code of Conduct</h4>
+              </div>
+              <ul className="space-y-3.5 text-xs text-slate-600 leading-relaxed">
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Punctuality:</strong> Please arrive 15 minutes prior to the shift start to receive instructions from the session mentor.
+                    <strong>Punctuality & Reporting:</strong> Please arrive 15 minutes before your shift start time to receive materials and briefing from the session mentor.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Warm Welcome:</strong> We are a safe, inclusive creative space. Greet all workshop participants with warmth and encouragement.
+                    <strong>Warm & Encouraging Atmosphere:</strong> Woo Woo Art House is an inclusive creative haven. Greet participants with enthusiasm and maintain a supportive environment.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Dress Code:</strong> Comfortable casual attire suitable for creative work. An official Woo Woo Art House apron will be provided on-site.
+                    <strong>Dress Code & Volunteer Apron:</strong> Wear comfortable casual clothes suited for creative work. An official Woo Woo Art House apron and badge will be provided on-site.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Safety & Materials Care:</strong> Keep workshop tables organized, clean brushes and pottery tools post-session, and immediately notify the coordinator of any material shortage.
                   </span>
                 </li>
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-              <h4 className="text-sm font-black text-slate-900 mb-1">Coordinator Contacts</h4>
-              <p className="text-xs text-slate-500 mb-4">Need to reschedule a shift or have questions about a role?</p>
+            {/* Compensation, Hours & Payout Policy */}
+            <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/60 via-[#F0FDF4]/30 to-white p-4 sm:p-6 shadow-2xs">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="h-5 w-5 text-[#059669]" />
+                <h4 className="text-sm sm:text-base font-black text-slate-900">Stipend & Free Studio Credits Policy</h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4">
+                <div className="rounded-xl border border-emerald-100 bg-white p-3.5">
+                  <span className="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                    Shift Verification
+                  </span>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Mentors verify volunteer hours immediately at the close of every session.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-white p-3.5">
+                  <span className="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                    Wallet Credit
+                  </span>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Verified stipends are credited to your WooWoo Wallet within 24 to 48 hours.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-white p-3.5">
+                  <span className="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                    Free Studio Hours
+                  </span>
+                  <p className="mt-1 text-xs text-slate-600">
+                    For every 2 hours volunteered, you earn 1 hour of complimentary personal studio time.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Coordinator Contacts */}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-6">
+              <h4 className="text-sm font-black text-slate-900 mb-1">Coordinator Contacts & Support</h4>
+              <p className="text-xs text-slate-500 mb-4">
+                Need to reschedule a shift, report an absence, or have questions regarding volunteer roles?
+              </p>
               <div className="flex flex-wrap gap-3">
                 <a
                   href={helpWhatsApp}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-xs font-bold text-white shadow-xs"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#20ba59] transition cursor-pointer"
                 >
                   <MessageCircle className="h-4 w-4" />
                   <span>WhatsApp Coordinator</span>
                 </a>
                 <a
                   href="mailto:community@woowoo.art"
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                 >
                   <span>community@woowoo.art</span>
                 </a>
@@ -673,8 +1038,19 @@ export default function CvpProgramPage() {
       {showLogModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-            <h3 className="text-base font-black text-slate-900">Log Volunteer Hours</h3>
-            <p className="mt-1 text-xs text-slate-500">Submit completed volunteering hours for mentor sign-off</p>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-base font-black text-slate-900">Log Volunteer Hours</h3>
+              <button
+                type="button"
+                onClick={() => setShowLogModal(false)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Submit completed volunteering hours for mentor sign-off & stipend credit.
+            </p>
 
             <form onSubmit={handleSubmitHours} className="mt-4 space-y-3.5">
               <div>
@@ -715,21 +1091,34 @@ export default function CvpProgramPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Role / Responsibilities</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Materials prep, guest registration"
-                  value={newLogRole}
-                  onChange={(e) => setNewLogRole(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Role / Responsibilities</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Materials prep"
+                    value={newLogRole}
+                    onChange={(e) => setNewLogRole(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Stipend Claim (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 500"
+                    value={newLogStipend}
+                    onChange={(e) => setNewLogStipend(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="mt-5 flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 rounded-xl bg-[#059669] py-2.5 text-xs font-bold text-white hover:bg-[#047857] cursor-pointer"
+                  className="flex-1 rounded-xl bg-[#059669] py-2.5 text-xs font-bold text-white hover:bg-[#047857] shadow-xs cursor-pointer"
                 >
                   Submit for Review
                 </button>
@@ -755,17 +1144,15 @@ export default function CvpProgramPage() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <div className="mx-auto max-w-[1440px] p-4 md:p-6">
+      <div className="mx-auto max-w-[1440px] p-2.5 sm:p-4 md:p-6">
         <div className="hidden gap-6 xl:flex">
           <DashboardSidebar mode="fixed" />
           <div className="min-w-0 flex-1 space-y-6">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
             {content}
           </div>
         </div>
         <div className="xl:hidden">
-          <div className="space-y-5 pb-6">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+          <div className="pb-6">
             {content}
           </div>
         </div>

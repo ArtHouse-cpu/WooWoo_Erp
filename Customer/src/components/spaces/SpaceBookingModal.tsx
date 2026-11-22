@@ -496,14 +496,14 @@ export function SpaceBookingModal({
 
               {/* 1. Purpose (Dropdown) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-[10px] font-bold text-slate-700 mb-1">
                   Purpose <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <select
                     value={purpose}
                     onChange={e => setPurpose(e.target.value)}
-                    className="w-full h-[42px] px-3.5 text-xs sm:text-sm font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white cursor-pointer appearance-none pr-9 text-slate-900 shadow-2xs"
+                    className="w-full h-10 px-3 text-[10px] sm:text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white cursor-pointer appearance-none pr-8 text-slate-900 shadow-2xs"
                   >
                     {POPULAR_PURPOSES.map(p => (
                       <option key={p} value={p}>
@@ -511,7 +511,7 @@ export function SpaceBookingModal({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                 </div>
 
                 {purpose.toLowerCase() === 'other' && (
@@ -521,7 +521,7 @@ export function SpaceBookingModal({
                       value={customPurpose}
                       onChange={e => setCustomPurpose(e.target.value)}
                       placeholder="Specify your purpose (e.g. Photography, Dance, Workshop...)"
-                      className="w-full h-[42px] px-3.5 text-xs sm:text-sm font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white text-slate-900 shadow-2xs"
+                      className="w-full h-10 px-3 text-[10px] sm:text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white text-slate-900 shadow-2xs"
                       autoFocus
                     />
                   </div>
@@ -582,7 +582,7 @@ export function SpaceBookingModal({
               {/* 3. Date & Hours Required */}
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 truncate">
+                  <label className="block text-[10px] font-bold text-slate-700 mb-1 truncate">
                     Select Date <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
@@ -592,24 +592,24 @@ export function SpaceBookingModal({
                       value={bookingDate}
                       onChange={e => setBookingDate(e.target.value)}
                       required
-                      className="w-full h-[42px] px-3 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white text-slate-900 cursor-pointer"
+                      className="w-full h-10 px-3 text-[10px] sm:text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white text-slate-900 cursor-pointer shadow-2xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700 truncate">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold text-slate-700 truncate">
                       Hours Required <span className="text-rose-500">*</span>
                     </label>
-                    <span className="text-[10px] font-semibold text-slate-400">Min 1 hr</span>
+                    <span className="text-[9px] font-semibold text-slate-400">Min 1 hr</span>
                   </div>
-                  <div className="flex h-[42px] items-center justify-between rounded-xl border border-slate-200 bg-white px-2">
+                  <div className="flex h-10 items-center justify-between rounded-xl border border-slate-200 bg-white px-2 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => handleDurationChange(Math.max(1, durationHours - 1))}
                       disabled={durationHours <= 1}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-xs active:scale-95 transition cursor-pointer"
                       title="Decrease hours"
                     >
                       -
@@ -626,9 +626,9 @@ export function SpaceBookingModal({
                             handleDurationChange(Math.max(1, Math.min(18, val)));
                           }
                         }}
-                        className="w-7 sm:w-8 text-center text-xs font-bold text-slate-900 bg-transparent focus:outline-hidden"
+                        className="w-7 sm:w-8 text-center text-[10px] sm:text-xs font-bold text-slate-900 bg-transparent focus:outline-hidden"
                       />
-                      <span className="text-xs font-semibold text-slate-600">
+                      <span className="text-[10px] sm:text-xs font-semibold text-slate-600">
                         {durationHours === 1 ? 'Hr' : 'Hrs'}
                       </span>
                     </div>
@@ -636,7 +636,7 @@ export function SpaceBookingModal({
                       type="button"
                       onClick={() => handleDurationChange(Math.min(18, durationHours + 1))}
                       disabled={durationHours >= 18}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-xs active:scale-95 transition cursor-pointer"
                       title="Increase hours"
                     >
                       +
@@ -647,12 +647,12 @@ export function SpaceBookingModal({
 
               {/* 4. Preferred Time Slot (Custom Timing) */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Preferred Time Slot (Custom Timing) <span className="text-rose-500">*</span>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold text-slate-700">
+                     Select Time Slot  <span className="text-rose-500">*</span>
                   </label>
                   <span
-                    className={`text-xs font-bold ${
+                    className={`text-[10px] font-bold ${
                       isValidTimeRange ? 'text-[#6344E7]' : 'text-rose-500'
                     }`}
                   >
@@ -668,13 +668,13 @@ export function SpaceBookingModal({
                       max="23:59"
                       value={startTime}
                       onChange={e => handleStartTimeChange(e.target.value)}
-                      className="w-full h-[42px] px-3 text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer"
+                      className="w-full h-10 px-3 text-[10px] sm:text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer shadow-2xs"
                       title="Start Time"
                       required
                     />
                   </div>
 
-                  <span className="text-xs font-bold text-slate-400 px-1">to</span>
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-400 px-1">to</span>
 
                   <div className="relative">
                     <input
@@ -683,7 +683,7 @@ export function SpaceBookingModal({
                       max="23:59"
                       value={endTime === '24:00' ? '00:00' : endTime}
                       onChange={e => handleEndTimeChange(e.target.value)}
-                      className="w-full h-[42px] px-3 text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer"
+                      className="w-full h-10 px-3 text-[10px] sm:text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer shadow-2xs"
                       title="End Time"
                       required
                     />

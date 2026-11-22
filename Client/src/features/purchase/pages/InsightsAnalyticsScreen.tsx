@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
+  Calendar,
+  ChevronDown,
   Clock3,
+  Layers,
   Loader2,
   RefreshCw,
   RotateCcw,
   Search,
   ShoppingBag,
   Store,
+  TrendingUp,
   Users,
   Utensils,
   X,
@@ -50,7 +56,7 @@ const PRESETS: { id: InsightPreset; label: string }[] = [
   { id: "custom", label: "Custom" },
 ];
 
-const SEGMENT_COLOR = { food: "#d97706", space: "#4f46e5", store: "#0f766e" };
+const SEGMENT_COLOR = { food: "#f59e0b", space: "#6366f1", store: "#0d9488" };
 const inr = (value: number) => `₹${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
 const pretty = (ymd?: string) => {
   if (!ymd) return "—";
@@ -70,7 +76,8 @@ const apiMessage = (error: unknown) => {
 };
 
 const InsightsAnalyticsScreen = () => {
-  const [preset, setPreset] = useState<InsightPreset>("today");
+  const navigate = useNavigate();
+  const [preset, setPreset] = useState<InsightPreset>("last30");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [segment, setSegment] = useState<InsightSegment>("all");
@@ -119,127 +126,209 @@ const InsightsAnalyticsScreen = () => {
   }, [data?.range?.from, data?.range?.to]);
 
   const reset = () => {
-    setPreset("today");
+    setPreset("last30");
     setFrom("");
     setTo("");
     setSegment("all");
     setMembership("all");
   };
 
+  const segmentLabel =
+    segment === "all"
+      ? "All Segments"
+      : segment === "food"
+      ? "Food"
+      : segment === "space"
+      ? "Space"
+      : "Store";
+
+  const membershipLabel =
+    membership === "all"
+      ? "All Customers"
+      : membership === "member"
+      ? "Membership"
+      : "Non-membership";
+
   return (
-    <div className="mx-auto max-w-7xl space-y-4 sm:space-y-5 px-3 py-3 sm:px-6 sm:py-5">
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900">Insights & Analytics</h1>
-          <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-slate-400">
-            {data ? `${pretty(data.range.from)} – ${pretty(data.range.to)} · Updated ${new Date(data.generatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "Select a date range"}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-2 w-full sm:w-auto">
-          <FilterSelect
-            label="Date"
-            value={preset}
-            onChange={value => setPreset(value as InsightPreset)}
-            className="w-full sm:w-36"
-          >
-            {PRESETS.map(item => (
-              <option key={item.id} value={item.id}>{item.label}</option>
-            ))}
-          </FilterSelect>
-          {preset === "custom" ? (
-            <>
-              <label className="flex flex-col gap-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-slate-400 w-full sm:w-auto">
-                From
-                <input type="date" value={from} onChange={event => setFrom(event.target.value)} className="w-full sm:w-36 h-9 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
-              </label>
-              <label className="flex flex-col gap-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-slate-400 w-full sm:w-auto">
-                To
-                <input type="date" value={to} onChange={event => setTo(event.target.value)} className="w-full sm:w-36 h-9 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
-              </label>
-            </>
-          ) : null}
-          <FilterSelect
-            label="Segment"
-            value={segment}
-            onChange={value => setSegment(value as InsightSegment)}
-            className="w-full sm:w-36"
-          >
-            <option value="all">All segments</option>
-            <option value="food">Food</option>
-            <option value="space">Space</option>
-            <option value="store">Store</option>
-          </FilterSelect>
-          <FilterSelect
-            label="Membership"
-            value={membership}
-            onChange={value => setMembership(value as InsightMembership)}
-            className="w-full sm:w-40 col-span-2 sm:col-span-1"
-          >
-            <option value="all">All customers</option>
-            <option value="member">Membership</option>
-            <option value="nonmember">Non-membership</option>
-          </FilterSelect>
-          <div className="col-span-2 sm:col-span-1 flex items-center gap-2 w-full sm:w-auto pt-1 sm:pt-0">
-            <button type="button" onClick={reset} className="flex-1 sm:flex-initial inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition active:scale-95">
-              <RotateCcw size={14} /> Reset
+    <div className="min-h-screen bg-gradient-to-b from-[#F2EDFD] via-[#F4F3FF] to-[#E9EFFD] px-3 py-3 sm:px-6 sm:py-5">
+      <div className="mx-auto max-w-7xl space-y-3 sm:space-y-3.5">
+        {/* ================= TOP HEADER (MATCH REFERENCE) ================= */}
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-slate-100/90 transition hover:scale-95 active:scale-90 cursor-pointer"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
             </button>
-            <button type="button" onClick={() => setReloadKey(key => key + 1)} className="flex-1 sm:flex-initial inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition active:scale-95">
-              <RefreshCw size={14} /> Refresh
+            <h1 className="truncate text-lg sm:text-xl font-black tracking-tight text-slate-900">
+              Insights & Analytics
+            </h1>
+          </div>
+
+          {/* Right: Refresh icon button on left side of Date filter */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Refresh icon button on left side of date filter */}
+            <button
+              type="button"
+              onClick={() => setReloadKey(k => k + 1)}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#673DE6] shadow-[0_2px_10px_rgba(103,61,230,0.08)] border border-purple-100/90 transition hover:bg-purple-50 hover:scale-95 active:scale-90 cursor-pointer"
+              aria-label="Refresh data"
+              title="Refresh"
+            >
+              <RefreshCw size={16} strokeWidth={2.3} className={loading ? "animate-spin" : ""} />
             </button>
+
+            {/* Date filter pill with pink sparkle burst accent */}
+            <div className="relative shrink-0">
+              {/* Pink burst decorative rays */}
+              <div className="absolute -top-2.5 -right-1 text-[#F43F5E] pointer-events-none select-none">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                  <path d="M12 2v4" />
+                  <path d="M19.5 4.5l-2.8 2.8" />
+                  <path d="M22 12h-4" />
+                </svg>
+              </div>
+
+              <div className="relative">
+                <div className="flex items-center gap-2 rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_10px_rgba(103,61,230,0.08)] border border-purple-100/90 text-slate-800 font-bold text-xs pointer-events-none">
+                  <Calendar size={15} className="text-[#673DE6]" strokeWidth={2.2} />
+                  <span>{PRESETS.find(p => p.id === preset)?.label || "Date"}</span>
+                  <ChevronDown size={14} className="text-slate-500" strokeWidth={2.5} />
+                </div>
+                <select
+                  value={preset}
+                  onChange={e => setPreset(e.target.value as InsightPreset)}
+                  aria-label="Date range filter"
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                >
+                  {PRESETS.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-      </header>
-      <section className="space-y-2">
-        <h2 className="text-xs sm:text-sm font-bold text-slate-900">Space booking utilization</h2>
+
+        {/* ================= ROW 2: FILTERS (SEGMENT & MEMBERSHIP) ================= */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Segment filter pill */}
+          <div className="relative">
+            <div className="flex items-center justify-between rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-100/90 text-slate-800 font-bold text-xs pointer-events-none">
+              <div className="flex items-center gap-2 truncate">
+                <Layers size={16} className="text-[#673DE6] shrink-0" strokeWidth={2.2} />
+                <span className="truncate">{segmentLabel}</span>
+              </div>
+              <ChevronDown size={14} className="text-slate-500 shrink-0 ml-1" strokeWidth={2.5} />
+            </div>
+            <select
+              value={segment}
+              onChange={e => setSegment(e.target.value as InsightSegment)}
+              aria-label="Segment filter"
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            >
+              <option value="all">All Segments</option>
+              <option value="food">Food</option>
+              <option value="space">Space</option>
+              <option value="store">Store</option>
+            </select>
+          </div>
+
+          {/* Membership filter pill */}
+          <div className="relative">
+            <div className="flex items-center justify-between rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-100/90 text-slate-800 font-bold text-xs pointer-events-none">
+              <div className="flex items-center gap-2 truncate">
+                <Users size={16} className="text-[#673DE6] shrink-0" strokeWidth={2.2} />
+                <span className="truncate">{membershipLabel}</span>
+              </div>
+              <ChevronDown size={14} className="text-slate-500 shrink-0 ml-1" strokeWidth={2.5} />
+            </div>
+            <select
+              value={membership}
+              onChange={e => setMembership(e.target.value as InsightMembership)}
+              aria-label="Membership filter"
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            >
+              <option value="all">All Customers</option>
+              <option value="member">Membership</option>
+              <option value="nonmember">Non-membership</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ================= ROW 3: ACTION BUTTONS (DESKTOP ONLY - HIDDEN ON MOBILE) ================= */}
+        <div className="hidden sm:grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={reset}
+            className="flex items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-white py-2.5 text-xs font-bold text-[#673DE6] shadow-[0_2px_8px_rgba(103,61,230,0.06)] hover:bg-purple-50 transition active:scale-95 cursor-pointer"
+          >
+            <RotateCcw size={15} strokeWidth={2.2} />
+            <span>Reset</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setReloadKey(k => k + 1)}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-[#673DE6] py-2.5 text-xs font-bold text-white shadow-[0_4px_14px_rgba(103,61,230,0.35)] hover:bg-[#5B33D4] transition active:scale-95 cursor-pointer"
+          >
+            <RefreshCw size={15} strokeWidth={2.2} />
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        {/* Custom date range if selected */}
+        {preset === "custom" && (
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center justify-between rounded-2xl bg-white px-3.5 py-2 shadow-xs border border-purple-100 text-xs font-bold text-slate-700">
+              <span className="text-[10px] uppercase text-purple-600 font-extrabold">From</span>
+              <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="bg-transparent text-xs outline-none" />
+            </label>
+            <label className="flex items-center justify-between rounded-2xl bg-white px-3.5 py-2 shadow-xs border border-purple-100 text-xs font-bold text-slate-700">
+              <span className="text-[10px] uppercase text-purple-600 font-extrabold">To</span>
+              <input type="date" value={to} onChange={e => setTo(e.target.value)} className="bg-transparent text-xs outline-none" />
+            </label>
+          </div>
+        )}
+
+        {/* ================= 1. SEGMENT REVENUE CARDS (SIDE SCROLLABLE JUST BELOW FILTERS) ================= */}
+        {data ? <SegmentCards segments={data.segments} /> : null}
+
+        {/* ================= 2. TIME-OF-DAY PERIOD KPIS ================= */}
+        {data ? <PeriodKpis periods={data.peak.periods} /> : null}
+
+        {/* ================= SPACE BOOKING UTILIZATION & DAY-WISE CHART ================= */}
         <SpaceUtilizationPanel data={spaceUse} />
-      </section>
 
-      {error ? (
-        <div className="rounded-xl sm:rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm text-rose-700">{error}</div>
-      ) : null}
-      {preset === "custom" && !canLoad ? (
-        <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-xs sm:text-sm text-slate-500">Choose a start and end date.</div>
-      ) : null}
+        {/* ================= ERROR & SKELETON ================= */}
+        {error ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm font-semibold text-rose-700 shadow-2xs">
+            {error}
+          </div>
+        ) : null}
+        {preset === "custom" && !canLoad ? (
+          <div className="rounded-2xl border border-purple-100 bg-white px-4 py-8 text-center text-xs sm:text-sm font-semibold text-purple-600 shadow-2xs">
+            Choose a start and end date.
+          </div>
+        ) : null}
 
-      {loading && !data ? <Skeleton /> : null}
-      {data ? (
-        <>
-          <RevenueSection data={data} loading={loading} />
-          <TopSection data={data} />
-          <VisitorSection query={query} summary={data.visitors} />
-          <PeakSection data={data} />
-        </>
-      ) : null}
+        {loading && !data ? <Skeleton /> : null}
+
+        {/* ================= REVENUE, TOP ITEMS, VISITORS, PEAK ================= */}
+        {data ? (
+          <>
+            <RevenueSection data={data} loading={loading} />
+            <TopSection data={data} />
+            <VisitorSection query={query} summary={data.visitors} />
+            <PeakSection data={data} />
+          </>
+        ) : null}
+      </div>
     </div>
   );
 };
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  className = "w-full sm:w-36",
-  children,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-slate-400">
-      {label}
-      <select
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        className={`${className} h-9 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none`}
-      >
-        {children}
-      </select>
-    </label>
-  );
-}
 
 function ChipGroup<T extends string>({
   value,
@@ -251,14 +340,16 @@ function ChipGroup<T extends string>({
   options: [T, string][];
 }) {
   return (
-    <div className="flex rounded-lg bg-slate-100 p-0.5">
+    <div className="flex rounded-xl bg-purple-50/80 p-0.5 border border-purple-100/80">
       {options.map(([id, label]) => (
         <button
           key={id}
           type="button"
           onClick={() => onChange(id)}
-          className={`rounded-md px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold transition ${
-            value === id ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+          className={`rounded-lg px-2.5 py-1 text-[10px] sm:text-[11px] font-bold transition cursor-pointer ${
+            value === id
+              ? "bg-[#673DE6] text-white shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
           {label}
@@ -268,7 +359,116 @@ function ChipGroup<T extends string>({
   );
 }
 
+function PeriodKpis({ periods }: { periods: InsightsPayload["peak"]["periods"] }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4">
+      {periods.map(row => (
+        <div
+          key={row.key}
+          className="rounded-2xl border border-purple-100/90 bg-white p-3 sm:p-3.5 text-xs shadow-[0_2px_8px_rgba(103,61,230,0.04)] hover:border-purple-200 transition"
+        >
+          <div className="flex items-center justify-between">
+            <p className="font-bold text-slate-900 text-xs sm:text-sm">{row.label}</p>
+            <span className="rounded-lg bg-purple-100/80 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-[#673DE6]">
+              {row.share}%
+            </span>
+          </div>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 font-medium">{row.hint}</p>
+          <p className="mt-1.5 font-bold text-slate-800 text-[11px] sm:text-xs leading-tight">
+            {row.bills} bills <span className="text-slate-400 font-normal">·</span>{" "}
+            <span className="text-emerald-600 font-bold">{inr(row.revenue)}</span>
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SegmentCards({ segments }: { segments: InsightsPayload["segments"] }) {
+  return (
+    <div className="flex overflow-x-auto gap-3 pb-2 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 scrollbar-none snap-x snap-mandatory overscroll-x-contain">
+      {segments.map((row) => {
+        const cardTheme = row.key === "food"
+          ? "border-amber-200/90 bg-gradient-to-br from-amber-50/80 via-orange-50/30 to-white shadow-xs"
+          : row.key === "space"
+          ? "border-indigo-200/90 bg-gradient-to-br from-indigo-50/80 via-purple-50/30 to-white shadow-xs"
+          : "border-teal-200/90 bg-gradient-to-br from-teal-50/80 via-emerald-50/30 to-white shadow-xs";
+
+        const iconTheme = row.key === "food"
+          ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/25"
+          : row.key === "space"
+          ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-sm shadow-indigo-500/25"
+          : "bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-sm shadow-teal-500/25";
+
+        const textTheme = row.key === "food"
+          ? "text-amber-950"
+          : row.key === "space"
+          ? "text-indigo-950"
+          : "text-teal-950";
+
+        const dlTheme = row.key === "food"
+          ? "bg-amber-50/70 border-amber-100/90"
+          : row.key === "space"
+          ? "bg-indigo-50/70 border-indigo-100/90"
+          : "bg-teal-50/70 border-teal-100/90";
+
+        return (
+          <article
+            key={row.key}
+            className={`w-[85vw] max-w-[340px] sm:w-[340px] lg:w-auto shrink-0 snap-start flex flex-col justify-between rounded-2xl border ${cardTheme} p-3.5 sm:p-4`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${iconTheme}`}>
+                    {row.key === "food" ? <Utensils size={15} /> : row.key === "space" ? <Store size={15} /> : <ShoppingBag size={15} />}
+                  </span>
+                  <div>
+                    <p className="text-xs sm:text-sm font-bold text-slate-900">{row.label}</p>
+                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">{row.share}% of net sales</p>
+                  </div>
+                </div>
+                <Trend value={row.changePct} />
+              </div>
+              <p className={`mt-2.5 sm:mt-3 text-xl sm:text-2xl font-black ${textTheme}`}>{inr(row.revenue)}</p>
+              <dl className={`mt-2.5 sm:mt-3 grid grid-cols-2 gap-2 text-[10px] sm:text-[11px] rounded-xl p-2.5 border ${dlTheme}`}>
+                <div><dt className="text-slate-500 font-medium">Bills</dt><dd className="font-bold text-slate-800">{row.bills}</dd></div>
+                <div><dt className="text-slate-500 font-medium">Average bill</dt><dd className="font-bold text-slate-800">{inr(row.average)}</dd></div>
+                <div><dt className="text-slate-500 font-medium">{row.key === "space" ? "Booked hours" : "Quantity sold"}</dt><dd className="font-bold text-slate-800">{row.key === "space" ? row.hours : row.qty}</dd></div>
+                <div><dt className="text-slate-500 font-medium">{row.key === "space" ? "Bookings" : "Previous period"}</dt><dd className="font-bold text-slate-800">{row.key === "space" ? row.bookings : inr(row.previousRevenue)}</dd></div>
+              </dl>
+            </div>
+            {row.top[0] ? <p className="mt-2.5 truncate text-[10px] sm:text-[11px] text-slate-500">Top: <span className="font-bold text-slate-800">{row.top[0].name}</span></p> : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 function RevenueSection({ data, loading }: { data: InsightsPayload; loading: boolean }) {
+  const [mobileSlide, setMobileSlide] = useState(0);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleMobileScroll = () => {
+    if (!mobileScrollRef.current) return;
+    const { scrollLeft, clientWidth } = mobileScrollRef.current;
+    if (clientWidth > 0) {
+      const idx = Math.round(scrollLeft / clientWidth);
+      setMobileSlide(idx);
+    }
+  };
+
+  const scrollToSlide = (idx: number) => {
+    if (!mobileScrollRef.current) return;
+    const clientWidth = mobileScrollRef.current.clientWidth;
+    mobileScrollRef.current.scrollTo({
+      left: idx * clientWidth,
+      behavior: "smooth",
+    });
+    setMobileSlide(idx);
+  };
+
   const donut = data.segments.filter(row => row.revenue > 0).map(row => ({
     name: row.label,
     value: row.revenue,
@@ -282,47 +482,107 @@ function RevenueSection({ data, loading }: { data: InsightsPayload; loading: boo
 
   return (
     <section className="space-y-3">
-      <SectionTitle title="Revenue overview" note={loading ? "Updating…" : "Compared with the previous period of the same length"} />
-      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-2">
-        <DonutCard title="By business segment" center={inr(data.totals.revenue)} rows={donut} empty="No billed sales in this range." />
-        <DonutCard title="Membership vs non-membership" center={inr(data.totals.revenue)} rows={memberDonut} empty="No billed sales in this range." />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
-        {data.segments.map((row, idx) => (
-          <article
-            key={row.key}
-            className={`rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-xs ${
-              idx === data.segments.length - 1 ? "sm:col-span-2 lg:col-span-1" : ""
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: SEGMENT_COLOR[row.key] }}>
-                  {row.key === "food" ? <Utensils size={14} /> : row.key === "space" ? <Store size={14} /> : <ShoppingBag size={14} />}
-                </span>
-                <div>
-                  <p className="text-xs sm:text-sm font-bold text-slate-900">{row.label}</p>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400">{row.share}% of net sales</p>
-                </div>
-              </div>
-              <Trend value={row.changePct} />
+      <SectionTitle title="Revenue Overview" note={loading ? "Updating…" : "Compared with previous period"} />
+
+      {/* MOBILE VIEW ONLY: Both donuts unified inside ONE box, horizontally scrollable */}
+      <div className="block sm:hidden">
+        <article className="rounded-2xl border border-purple-100/90 bg-white p-3.5 shadow-xs">
+          {/* Header inside box with slide tabs & pagination dots */}
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-purple-100/70">
+            <div className="flex items-center gap-1 rounded-xl bg-purple-50/80 p-0.5 border border-purple-100/80">
+              <button
+                type="button"
+                onClick={() => scrollToSlide(0)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                  mobileSlide === 0
+                    ? "bg-[#673DE6] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Segment
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSlide(1)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                  mobileSlide === 1
+                    ? "bg-[#673DE6] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Membership
+              </button>
             </div>
-            <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-black text-slate-900">{inr(row.revenue)}</p>
-            <dl className="mt-2 sm:mt-3 grid grid-cols-2 gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] text-slate-500">
-              <div><dt>Bills</dt><dd className="font-semibold text-slate-800">{row.bills}</dd></div>
-              <div><dt>Average bill</dt><dd className="font-semibold text-slate-800">{inr(row.average)}</dd></div>
-              <div><dt>{row.key === "space" ? "Booked hours" : "Quantity sold"}</dt><dd className="font-semibold text-slate-800">{row.key === "space" ? row.hours : row.qty}</dd></div>
-              <div><dt>{row.key === "space" ? "Bookings" : "Previous period"}</dt><dd className="font-semibold text-slate-800">{row.key === "space" ? row.bookings : inr(row.previousRevenue)}</dd></div>
-            </dl>
-            {row.top[0] ? <p className="mt-2.5 sm:mt-3 truncate text-[10px] sm:text-[11px] text-slate-500">Top: <span className="font-semibold text-slate-700">{row.top[0].name}</span></p> : null}
-          </article>
-        ))}
+
+            {/* Pagination indicator dots */}
+            <div className="flex items-center gap-1.5 px-1">
+              <button
+                type="button"
+                onClick={() => scrollToSlide(0)}
+                aria-label="View Segment Breakdown"
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  mobileSlide === 0 ? "w-5 bg-[#673DE6]" : "w-2 bg-purple-200"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => scrollToSlide(1)}
+                aria-label="View Membership Breakdown"
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  mobileSlide === 1 ? "w-5 bg-[#673DE6]" : "w-2 bg-purple-200"
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Horizontally scrollable slides container */}
+          <div
+            ref={mobileScrollRef}
+            onScroll={handleMobileScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none overscroll-x-contain"
+          >
+            <div className="w-full shrink-0 snap-start">
+              <DonutBlock
+                title="By Business Segment"
+                center={inr(data.totals.revenue)}
+                rows={donut}
+                empty="No billed sales in this range."
+              />
+            </div>
+            <div className="w-full shrink-0 snap-start">
+              <DonutBlock
+                title="Membership vs Non-membership"
+                center={inr(data.totals.revenue)}
+                rows={memberDonut}
+                empty="No billed sales in this range."
+              />
+            </div>
+          </div>
+        </article>
+      </div>
+
+      {/* WEB VIEW (UNTOUCHED): 2 separate side-by-side boxes */}
+      <div className="hidden sm:grid sm:grid-cols-2 gap-2.5 sm:gap-3">
+        <DonutCard
+          title="By Business Segment"
+          center={inr(data.totals.revenue)}
+          rows={donut}
+          empty="No billed sales in this range."
+          theme="amber"
+        />
+        <DonutCard
+          title="Membership vs Non-membership"
+          center={inr(data.totals.revenue)}
+          rows={memberDonut}
+          empty="No billed sales in this range."
+          theme="purple"
+        />
       </div>
     </section>
   );
 }
 
-function DonutCard({
+function DonutBlock({
   title,
   center,
   rows,
@@ -334,10 +594,10 @@ function DonutCard({
   empty: string;
 }) {
   return (
-    <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-xs">
+    <div>
       <h3 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h3>
       {rows.length === 0 ? (
-        <p className="py-10 sm:py-16 text-center text-xs sm:text-sm text-slate-400">{empty}</p>
+        <p className="py-8 sm:py-16 text-center text-xs sm:text-sm text-slate-400">{empty}</p>
       ) : (
         <div className="mt-2 grid items-center gap-2 sm:grid-cols-[200px_1fr] md:grid-cols-[220px_1fr]">
           <div className="relative h-44 sm:h-52">
@@ -350,7 +610,7 @@ function DonutCard({
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide text-slate-400">Net sales</span>
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-slate-400">Net Sales</span>
               <span className="text-xs sm:text-sm font-black text-slate-900">{center}</span>
             </div>
           </div>
@@ -358,50 +618,97 @@ function DonutCard({
             {rows.map(row => (
               <li key={row.name} className="flex items-center justify-between gap-2 sm:gap-3 text-[11px] sm:text-xs">
                 <span className="flex items-center gap-1.5 sm:gap-2 text-slate-600 truncate">
-                  <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full shrink-0" style={{ background: row.color }} />
-                  <span className="truncate">{row.name}</span>
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: row.color }} />
+                  <span className="truncate font-medium">{row.name}</span>
                 </span>
-                <span className="font-semibold text-slate-900 shrink-0">{inr(row.value)} · {row.share}%</span>
+                <span className="font-bold text-slate-900 shrink-0">{inr(row.value)} · {row.share}%</span>
               </li>
             ))}
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function DonutCard({
+  title,
+  center,
+  rows,
+  empty,
+  theme = "purple",
+}: {
+  title: string;
+  center: string;
+  rows: { name: string; value: number; share: number; color: string }[];
+  empty: string;
+  theme?: "amber" | "purple";
+}) {
+  const cardBorder = theme === "amber"
+    ? "border-amber-100/90 bg-gradient-to-br from-amber-50/20 via-white to-purple-50/20"
+    : "border-purple-100/90 bg-gradient-to-br from-purple-50/25 via-white to-indigo-50/20";
+
+  return (
+    <article className={`rounded-2xl border ${cardBorder} p-3.5 sm:p-4 shadow-xs`}>
+      <DonutBlock title={title} center={center} rows={rows} empty={empty} />
     </article>
   );
 }
 
 function Trend({ value }: { value: number | null }) {
-  if (value == null) return <span className="text-[11px] font-semibold text-indigo-600">New</span>;
+  if (value == null) return <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-[#673DE6] border border-purple-200">New</span>;
   const up = value >= 0;
-  return <span className={`text-[11px] font-semibold ${up ? "text-emerald-600" : "text-rose-600"}`}>{up ? "+" : ""}{value}%</span>;
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold border ${
+      up ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
+    }`}>
+      {up ? "+" : ""}{value}%
+    </span>
+  );
 }
 
 function TopSection({ data }: { data: InsightsPayload }) {
   const [limit, setLimit] = useState<5 | 10>(5);
   const [sort, setSort] = useState<"revenue" | "qty">("revenue");
   const columns: { key: "food" | "store" | "space"; title: string }[] = [
-    { key: "food", title: "Most selling food" },
-    { key: "store", title: "Most selling store products" },
-    { key: "space", title: "Most popular spaces" },
+    { key: "food", title: "Most Selling Food" },
+    { key: "store", title: "Most Selling Store Products" },
+    { key: "space", title: "Most Popular Spaces" },
   ];
   return (
     <section className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <SectionTitle title="Top performing items" note="Completed final bills only" />
+        <SectionTitle title="Top Performing Items" note="Completed final bills only" />
         <div className="flex items-center gap-1.5 sm:gap-2">
           <ChipGroup value={sort} onChange={setSort} options={[["revenue", "Revenue"], ["qty", "Quantity"]]} />
           <ChipGroup value={String(limit) as "5" | "10"} onChange={value => setLimit(value === "10" ? 10 : 5)} options={[["5", "Top 5"], ["10", "Top 10"]]} />
         </div>
       </div>
-      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-3">
+      <div className="flex overflow-x-auto gap-3 pb-3 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 scrollbar-none snap-x snap-mandatory overscroll-x-contain">
         {columns.map(column => {
           const rows = [...data.top[column.key]].sort((a, b) => sort === "qty" ? b.qty - a.qty : b.revenue - a.revenue).slice(0, limit);
+          const borderBg = column.key === "food"
+            ? "border-amber-200/90 bg-gradient-to-b from-amber-50/40 via-white to-white"
+            : column.key === "space"
+            ? "border-indigo-200/90 bg-gradient-to-b from-indigo-50/40 via-white to-white"
+            : "border-teal-200/90 bg-gradient-to-b from-teal-50/40 via-white to-white";
+          const titleColor = column.key === "food"
+            ? "text-amber-900"
+            : column.key === "space"
+            ? "text-indigo-900"
+            : "text-teal-900";
+
           return (
-            <article key={column.key} className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
-              <h3 className="px-1 text-xs sm:text-sm font-bold text-slate-900">{column.title}</h3>
+            <article
+              key={column.key}
+              className={`w-[85vw] max-w-[340px] sm:w-[340px] lg:w-auto shrink-0 snap-start flex flex-col rounded-2xl border ${borderBg} p-3 shadow-xs`}
+            >
+              <h3 className={`flex items-center gap-2 px-1 text-xs sm:text-sm font-bold ${titleColor}`}>
+                {column.key === "food" ? <Utensils size={14} className="text-amber-600 shrink-0" /> : column.key === "space" ? <Store size={14} className="text-indigo-600 shrink-0" /> : <ShoppingBag size={14} className="text-teal-600 shrink-0" />}
+                <span>{column.title}</span>
+              </h3>
               {rows.length === 0 ? <p className="px-1 py-8 text-center text-xs text-slate-400">Nothing sold in this range.</p> : (
-                <ol className="mt-2 space-y-1.5 sm:space-y-2">
+                <ol className="mt-2 space-y-1.5 sm:space-y-2 flex-1">
                   {rows.map((row, index) => <RankRow key={row.name} index={index + 1} row={row} kind={column.key} />)}
                 </ol>
               )}
@@ -414,24 +721,40 @@ function TopSection({ data }: { data: InsightsPayload }) {
 }
 
 function RankRow({ index, row, kind }: { index: number; row: RankedItem; kind: "food" | "store" | "space" }) {
+  const badgeStyle = index === 1
+    ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white font-black shadow-2xs"
+    : index === 2
+    ? "bg-gradient-to-r from-slate-300 to-slate-400 text-slate-800 font-bold"
+    : index === 3
+    ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white font-bold"
+    : "bg-purple-100 text-[#673DE6] font-bold";
+
   return (
-    <li className="flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl bg-slate-50 px-2 py-1.5 sm:py-2">
-      <span className="w-3.5 sm:w-4 text-center text-[10px] sm:text-[11px] font-bold text-slate-400 shrink-0">{index}</span>
+    <li className="flex items-center gap-2 rounded-xl bg-white border border-slate-100/90 p-2 shadow-2xs hover:border-purple-200 transition">
+      <span className={`flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-lg text-[10px] sm:text-[11px] shrink-0 ${badgeStyle}`}>
+        {index}
+      </span>
       {row.image ? (
-        <img src={row.image} alt="" className="h-8 w-8 sm:h-9 sm:w-9 rounded-md sm:rounded-lg object-cover shrink-0" />
+        <img src={row.image} alt="" className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg object-cover shrink-0 border border-black/5" />
       ) : (
-        <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-md sm:rounded-lg bg-white text-[9px] sm:text-[10px] font-bold text-slate-400 shrink-0">
-          #{index}
+        <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-slate-50 border border-slate-100 text-slate-400 shrink-0">
+          {kind === "food" ? (
+            <Utensils size={13} className="text-amber-500/70" />
+          ) : kind === "space" ? (
+            <Store size={13} className="text-indigo-500/70" />
+          ) : (
+            <ShoppingBag size={13} className="text-teal-500/70" />
+          )}
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold text-slate-800">{row.name}</p>
+        <p className="truncate text-xs font-bold text-slate-800">{row.name}</p>
         <p className="truncate text-[10px] text-slate-400">
           {kind === "store" && row.sku ? `${row.sku} · ` : ""}
           {kind === "space" ? `${row.bookings || row.orders} bookings · ${row.hours || 0}h` : `${row.qty} sold · ${row.orders} bills`}
         </p>
       </div>
-      <span className="text-xs font-bold text-slate-900 shrink-0">{inr(row.revenue)}</span>
+      <span className="text-xs font-black text-slate-900 shrink-0">{inr(row.revenue)}</span>
     </li>
   );
 }
@@ -489,25 +812,35 @@ function VisitorSection({
 
   return (
     <section className="space-y-3">
-      <SectionTitle title="Visitor analytics" note="One bill is one transaction. A visit is a unique day with a bill." />
+      <SectionTitle title="Visitor Analytics" note="One bill is one transaction. A visit is a unique day with a bill." />
       <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-[1fr_280px]">
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
-          <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-4 shadow-xs">
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate">First-time visitors</p>
-            <p className="mt-0.5 sm:mt-1 text-xl sm:text-3xl font-black text-slate-900">{summary.firstTime}</p>
-            <p className="mt-0.5 text-[9px] sm:text-xs text-slate-400 line-clamp-2 leading-tight">
+          <article className="rounded-2xl border border-sky-200/90 bg-gradient-to-br from-sky-50/80 via-blue-50/20 to-white p-3 sm:p-4 shadow-xs">
+            <div className="flex items-center gap-1.5 text-sky-800">
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md bg-sky-100 text-sky-700">
+                <Users size={12} strokeWidth={2.5} />
+              </span>
+              <p className="text-[10px] sm:text-xs font-bold truncate">First-time visitors</p>
+            </div>
+            <p className="mt-1 sm:mt-1.5 text-xl sm:text-3xl font-black text-sky-950">{summary.firstTime}</p>
+            <p className="mt-0.5 text-[9px] sm:text-xs font-semibold text-sky-700 line-clamp-2 leading-tight">
               {summary.firstShare}% of {summary.unique} unique customers
             </p>
           </article>
-          <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-4 shadow-xs">
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate">Repeat visitors</p>
-            <p className="mt-0.5 sm:mt-1 text-xl sm:text-3xl font-black text-slate-900">{summary.repeat}</p>
-            <p className="mt-0.5 text-[9px] sm:text-xs text-slate-400 line-clamp-2 leading-tight">
+          <article className="rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/80 via-indigo-50/20 to-white p-3 sm:p-4 shadow-xs">
+            <div className="flex items-center gap-1.5 text-purple-800">
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md bg-purple-100 text-purple-700">
+                <Users size={12} strokeWidth={2.5} />
+              </span>
+              <p className="text-[10px] sm:text-xs font-bold truncate">Repeat visitors</p>
+            </div>
+            <p className="mt-1 sm:mt-1.5 text-xl sm:text-3xl font-black text-purple-950">{summary.repeat}</p>
+            <p className="mt-0.5 text-[9px] sm:text-xs font-semibold text-purple-700 line-clamp-2 leading-tight">
               {summary.repeatShare}% · more than one visit
             </p>
           </article>
         </div>
-        <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+        <article className="rounded-2xl border border-indigo-100/90 bg-gradient-to-br from-indigo-50/25 via-white to-sky-50/20 p-3 shadow-xs">
           {donut.length === 0 ? (
             <p className="py-6 sm:py-10 text-center text-xs text-slate-400">No visitors.</p>
           ) : (
@@ -525,52 +858,52 @@ function VisitorSection({
         </article>
       </div>
 
-      <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="rounded-2xl border border-purple-100/90 bg-white p-3 sm:p-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <ChipGroup value={bucket} onChange={setBucket} options={[["day", "Per day"], ["week", "Per week"], ["month", "Per month"]]} />
             <ChipGroup value={visits} onChange={setVisits} options={[["all", "All"], ["1", "1 visit"], ["2", "2 visits"], ["3", "3+ visits"]]} />
           </div>
-          <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 w-full sm:w-auto">
-            <Search size={13} className="text-slate-400 shrink-0" />
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Name or phone" className="w-full sm:w-36 bg-transparent text-xs outline-none" />
+          <label className="flex items-center gap-1.5 rounded-xl border border-purple-200/80 bg-white px-2.5 py-1.5 w-full sm:w-auto shadow-2xs">
+            <Search size={13} className="text-purple-500 shrink-0" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name or phone..." className="w-full sm:w-44 bg-transparent text-xs outline-none font-medium" />
           </label>
         </div>
-        <div className="mt-3 overflow-x-auto -mx-1 sm:mx-0">
-          <table className="min-w-[620px] sm:min-w-full text-left text-xs">
-            <thead className="text-[10px] uppercase tracking-wide text-slate-400">
+        <div className="mt-3 overflow-x-auto -mx-1 sm:mx-0 rounded-xl border border-slate-100">
+          <table className="min-w-[620px] sm:min-w-full text-left text-xs whitespace-nowrap">
+            <thead className="text-[10px] uppercase tracking-wider bg-gradient-to-r from-purple-50/70 via-slate-50 to-indigo-50/70 text-slate-600 font-bold">
               <tr>
                 {["Customer", "Phone", "Visits", "Bills", "First visit", "Last visit", "Spending", "Type"].map(heading => (
-                  <th key={heading} className="px-2 py-2 font-semibold">{heading}</th>
+                  <th key={heading} className="px-3 py-2.5 font-bold">{heading}</th>
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {rows.map(row => (
-                <tr key={row.key} onClick={() => setSelected(row)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-2 py-2 font-semibold text-slate-800">{row.name}</td>
-                  <td className="px-2 py-2 text-slate-500">{row.phone || "—"}</td>
-                  <td className="px-2 py-2">{row.visits}</td>
-                  <td className="px-2 py-2">{row.bills}</td>
-                  <td className="px-2 py-2">{pretty(row.firstVisit)}</td>
-                  <td className="px-2 py-2">{pretty(row.lastVisit)}</td>
-                  <td className="px-2 py-2 font-semibold">{inr(row.spend)}</td>
-                  <td className="px-2 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${row.visitType === "Repeat" ? "bg-violet-50 text-violet-700" : "bg-sky-50 text-sky-700"}`}>{row.visitType}</span>
+                <tr key={row.key} onClick={() => setSelected(row)} className="cursor-pointer hover:bg-purple-50/40 transition">
+                  <td className="px-3 py-2.5 font-bold text-slate-800">{row.name}</td>
+                  <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px]">{row.phone || "—"}</td>
+                  <td className="px-3 py-2.5 font-semibold text-slate-700">{row.visits}</td>
+                  <td className="px-3 py-2.5 font-semibold text-slate-700">{row.bills}</td>
+                  <td className="px-3 py-2.5 text-slate-500">{pretty(row.firstVisit)}</td>
+                  <td className="px-3 py-2.5 text-slate-500">{pretty(row.lastVisit)}</td>
+                  <td className="px-3 py-2.5 font-black text-emerald-700">{inr(row.spend)}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${row.visitType === "Repeat" ? "bg-purple-100 text-purple-700 border border-purple-200/80" : "bg-sky-100 text-sky-700 border border-sky-200/80"}`}>{row.visitType}</span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {!loading && rows.length === 0 ? <p className="py-8 text-center text-xs text-slate-400">No customers match this frequency.</p> : null}
-          {loading ? <p className="flex items-center justify-center gap-2 py-4 text-xs text-slate-400"><Loader2 size={14} className="animate-spin" /> Loading visitors</p> : null}
+          {loading ? <p className="flex items-center justify-center gap-2 py-4 text-xs text-purple-600 font-semibold"><Loader2 size={14} className="animate-spin" /> Loading visitors...</p> : null}
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
-          <span>{total} customers</span>
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+          <span className="font-semibold text-purple-700">{total} customers</span>
           <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-slate-200 px-2 py-1 disabled:opacity-40">Previous</button>
-            <span>{page} / {pages}</span>
-            <button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)} className="rounded-lg border border-slate-200 px-2 py-1 disabled:opacity-40">Next</button>
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-2xs disabled:opacity-40 cursor-pointer">Previous</button>
+            <span className="font-bold text-slate-800 self-center">{page} / {pages}</span>
+            <button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)} className="rounded-lg border border-purple-200 bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-2xs disabled:opacity-40 cursor-pointer">Next</button>
           </div>
         </div>
       </div>
@@ -591,20 +924,20 @@ function VisitDialog({ row, query, onClose }: { row: VisitorRow; query: InsightQ
   }, [row.key, query]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-2 sm:p-3 sm:items-center">
-      <div className="max-h-[90vh] sm:max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white p-3.5 sm:p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 backdrop-blur-xs p-2 sm:p-3 sm:items-center">
+      <div className="max-h-[90vh] sm:max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl sm:rounded-3xl border border-purple-100 bg-white p-4 sm:p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">{row.name}</h3>
-            <p className="text-[11px] sm:text-xs text-slate-500 truncate">{row.phone || "No phone"} {detail?.customer.member ? "· Membership" : ""}</p>
+            <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">{row.name}</h3>
+            <p className="text-[11px] sm:text-xs text-purple-700 font-semibold truncate">{row.phone || "No phone"} {detail?.customer.member ? "· Membership" : ""}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 shrink-0"><X size={16} /></button>
+          <button type="button" onClick={onClose} className="rounded-xl p-1.5 text-slate-500 hover:bg-slate-100 shrink-0 cursor-pointer"><X size={18} /></button>
         </div>
         {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
-        {!detail && !error ? <p className="mt-6 flex justify-center"><Loader2 className="animate-spin text-slate-400" size={18} /></p> : null}
+        {!detail && !error ? <p className="mt-6 flex justify-center"><Loader2 className="animate-spin text-purple-600" size={20} /></p> : null}
         {detail ? (
           <>
-            <dl className="mt-3 sm:mt-4 grid grid-cols-2 gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
+            <dl className="mt-3 sm:mt-4 grid grid-cols-2 gap-2 text-[11px] sm:text-xs">
               <Stat label="Visits in range" value={String(detail.range.visits)} />
               <Stat label="Bills in range" value={String(detail.range.bills)} />
               <Stat label="Spent in range" value={inr(detail.range.spend)} />
@@ -612,15 +945,15 @@ function VisitDialog({ row, query, onClose }: { row: VisitorRow; query: InsightQ
               <Stat label="First visit ever" value={pretty(detail.lifetime.firstVisit)} />
               <Stat label="Last visit ever" value={pretty(detail.lifetime.lastVisit)} />
             </dl>
-            <h4 className="mt-3 sm:mt-4 text-[10px] sm:text-xs font-bold uppercase tracking-wide text-slate-400">Bills in this range</h4>
+            <h4 className="mt-4 text-[10px] sm:text-xs font-bold uppercase tracking-wide text-purple-600">Bills in this range</h4>
             <ul className="mt-2 space-y-1.5 sm:space-y-2">
               {detail.range.billsList.map(bill => (
-                <li key={bill.invoiceCode} className="rounded-xl border border-slate-100 p-2 sm:px-3 sm:py-2 text-[11px] sm:text-xs">
-                  <div className="flex justify-between font-semibold text-slate-800">
-                    <span className="truncate">{bill.invoiceCode}</span>
-                    <span className="shrink-0">{inr(bill.amount)}</span>
+                <li key={bill.invoiceCode} className="rounded-xl border border-purple-100/80 bg-purple-50/30 p-2.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs">
+                  <div className="flex justify-between font-bold text-slate-800">
+                    <span className="truncate text-purple-900">{bill.invoiceCode}</span>
+                    <span className="shrink-0 text-emerald-700 font-black">{inr(bill.amount)}</span>
                   </div>
-                  <p className="text-slate-400 truncate">{pretty(bill.date)} · {bill.items.join(", ") || "Items"}</p>
+                  <p className="text-slate-500 truncate mt-0.5">{pretty(bill.date)} · {bill.items.join(", ") || "Items"}</p>
                 </li>
               ))}
               {detail.range.billsList.length === 0 ? <li className="text-xs text-slate-400">No bills in this range.</li> : null}
@@ -634,9 +967,9 @@ function VisitDialog({ row, query, onClose }: { row: VisitorRow; query: InsightQ
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-slate-50 p-2 sm:px-3 sm:py-2">
-      <dt className="text-[10px] sm:text-xs text-slate-400">{label}</dt>
-      <dd className="font-semibold text-slate-800 text-xs sm:text-sm">{value}</dd>
+    <div className="rounded-xl border border-purple-100/80 bg-gradient-to-br from-purple-50/40 to-white p-2.5 sm:px-3 sm:py-2 shadow-2xs">
+      <dt className="text-[10px] sm:text-xs text-slate-500 font-medium">{label}</dt>
+      <dd className="font-black text-slate-900 text-xs sm:text-sm mt-0.5">{value}</dd>
     </div>
   );
 }
@@ -647,81 +980,93 @@ function PeakSection({ data }: { data: InsightsPayload }) {
   return (
     <section className="space-y-3 pb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <SectionTitle title="Peak billing hours" note="Time is taken from when the bill was saved, in India time" />
+        <SectionTitle title="Peak Billing Hours" note="Time is taken from when bill was saved" />
         <ChipGroup value={metric} onChange={setMetric} options={[["bills", "Number of bills"], ["revenue", "Revenue"]]} />
       </div>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-        <Mini icon={<Clock3 size={15} />} label="Most active" value={data.peak.busiestPeriod || "—"} />
-        <Mini icon={<Store size={15} />} label="Highest revenue" value={data.peak.highestRevenuePeriod || "—"} />
-        <Mini icon={<Users size={15} />} label="Total bills" value={String(data.peak.totalBills)} />
-        <Mini icon={<Clock3 size={15} />} label="Average bills / day" value={String(data.peak.averageBillsPerDay)} />
+        <Mini icon={<Clock3 size={15} />} label="Most active" value={data.peak.busiestPeriod || "—"} theme="amber" />
+        <Mini icon={<Store size={15} />} label="Highest revenue" value={data.peak.highestRevenuePeriod || "—"} theme="emerald" />
+        <Mini icon={<Users size={15} />} label="Total bills" value={String(data.peak.totalBills)} theme="indigo" />
+        <Mini icon={<Clock3 size={15} />} label="Average bills / day" value={String(data.peak.averageBillsPerDay)} theme="rose" />
       </div>
       <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-2">
-        <ChartCard title="Time of day">
+        <ChartCard title="Time of Day">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.peak.periods} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
-              <YAxis tick={{ fontSize: 10 }} width={28} allowDecimals={false} />
+              <CartesianGrid stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} />
+              <YAxis tick={{ fontSize: 10, fill: "#64748b" }} width={28} allowDecimals={false} />
               <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
               <Bar dataKey={metric} radius={[5, 5, 0, 0]}>
                 {data.peak.periods.map(row => (
-                  <Cell key={row.key} fill={row.label === highlight ? "#4f46e5" : "#cbd5e1"} />
+                  <Cell key={row.key} fill={row.label === highlight ? "#673DE6" : "#DDD6FE"} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title={`Weekday · busiest ${data.peak.busiestDay || "—"}`}>
+        <ChartCard title={`Weekday · Busiest ${data.peak.busiestDay || "—"}`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.peak.weekdays} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 10 }} interval={0} />
-              <YAxis tick={{ fontSize: 10 }} width={28} allowDecimals={false} />
+              <CartesianGrid stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} />
+              <YAxis tick={{ fontSize: 10, fill: "#64748b" }} width={28} allowDecimals={false} />
               <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
               <Bar dataKey={metric} radius={[5, 5, 0, 0]}>
                 {data.peak.weekdays.map(row => (
-                  <Cell key={row.day} fill={row.day === data.peak.busiestDay ? "#0f766e" : "#cbd5e1"} />
+                  <Cell key={row.day} fill={row.day === data.peak.busiestDay ? "#059669" : "#A7F3D0"} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {data.peak.periods.map(row => (
-          <li key={row.key} className="rounded-xl border border-slate-200 bg-white p-2.5 sm:px-3 sm:py-2 text-xs">
-            <p className="font-bold text-slate-800 text-xs sm:text-sm">{row.label}</p>
-            <p className="text-[10px] sm:text-xs text-slate-400">{row.hint}</p>
-            <p className="mt-1 font-semibold text-slate-700 text-[10px] sm:text-xs leading-tight">
-              {row.bills} bills · {inr(row.revenue)}
-            </p>
-            <p className="text-[10px] sm:text-xs font-bold text-indigo-600">{row.share}%</p>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+    <article className="rounded-2xl border border-purple-100/90 bg-gradient-to-br from-purple-50/20 via-white to-white p-3 sm:p-4 shadow-xs">
       <h3 className="mb-2 text-xs sm:text-sm font-bold text-slate-900">{title}</h3>
       <div className="h-48 sm:h-60">{children}</div>
     </article>
   );
 }
 
-function Mini({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function Mini({
+  icon,
+  label,
+  value,
+  theme = "indigo",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  theme?: "amber" | "emerald" | "indigo" | "rose";
+}) {
+  const styles = {
+    amber: "border-amber-200/90 bg-gradient-to-br from-amber-50/70 to-white text-amber-950",
+    emerald: "border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 to-white text-emerald-950",
+    indigo: "border-indigo-200/90 bg-gradient-to-br from-indigo-50/70 to-white text-indigo-950",
+    rose: "border-rose-200/90 bg-gradient-to-br from-rose-50/70 to-white text-rose-950",
+  }[theme];
+
+  const iconStyles = {
+    amber: "bg-amber-100 text-amber-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+    indigo: "bg-indigo-100 text-indigo-700",
+    rose: "bg-rose-100 text-rose-700",
+  }[theme];
+
   return (
-    <article className="flex items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:px-3 sm:py-3 shadow-xs">
-      <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+    <article className={`flex items-center gap-2.5 rounded-2xl border p-2.5 sm:px-3 sm:py-3 shadow-xs ${styles}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${iconStyles}`}>
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[10px] sm:text-[11px] text-slate-400">{label}</p>
-        <p className="truncate text-xs sm:text-sm font-bold text-slate-900">{value}</p>
+        <p className="truncate text-[10px] sm:text-[11px] font-medium text-slate-500">{label}</p>
+        <p className="truncate text-xs sm:text-sm font-black">{value}</p>
       </div>
     </article>
   );
@@ -730,8 +1075,11 @@ function Mini({ icon, label, value }: { icon: ReactNode; label: string; value: s
 function SectionTitle({ title, note }: { title: string; note: string }) {
   return (
     <div>
-      <h2 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h2>
-      <p className="text-[10px] sm:text-[11px] text-slate-400">{note}</p>
+      <div className="flex items-center gap-1.5">
+        <span className="h-3.5 w-1 rounded-full bg-[#673DE6]" />
+        <h2 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h2>
+      </div>
+      <p className="text-[10px] sm:text-[11px] text-slate-400 pl-2.5">{note}</p>
     </div>
   );
 }
@@ -739,7 +1087,9 @@ function SectionTitle({ title, note }: { title: string; note: string }) {
 function Skeleton() {
   return (
     <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-32 sm:h-40 animate-pulse rounded-xl sm:rounded-2xl bg-slate-200/70" />)}
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="h-32 sm:h-40 animate-pulse rounded-2xl bg-gradient-to-br from-purple-50 to-slate-100 border border-purple-100" />
+      ))}
     </div>
   );
 }

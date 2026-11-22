@@ -48,8 +48,18 @@ export const quoteCoworkingBooking = async (customer, body = {}) => {
   const startDate = String(body.startDate || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw fail(400, 'Choose a start date.');
   const drink = String(body.drink || 'Tea').trim() === 'Coffee' ? 'Coffee' : 'Tea';
-  const regularTotal = money(MEMBERSHIP.regularPrice + plan.regularPrice);
-  const yourPrice = money(MEMBERSHIP.price + plan.memberPrice);
+
+  const pricingType = String(body.pricingType || body.priceType || '').toLowerCase() === 'regular' ? 'regular' : 'membership';
+  const isRegular = pricingType === 'regular';
+
+  const regularTotal = isRegular
+    ? money(plan.regularPrice)
+    : money(MEMBERSHIP.regularPrice + plan.regularPrice);
+
+  const yourPrice = isRegular
+    ? money(plan.regularPrice)
+    : money(MEMBERSHIP.price + plan.memberPrice);
+
   let coupon = null;
   let couponError = '';
   const couponCode = String(body.couponCode || '').trim();
@@ -71,15 +81,16 @@ export const quoteCoworkingBooking = async (customer, body = {}) => {
   }
   const payable = money(Math.max(0, yourPrice - (coupon?.discount || 0)));
   const coworkingEnd = addDays(startDate, plan.days - 1);
-  const membershipEnd = addDays(startDate, MEMBERSHIP.days - 1);
+  const membershipEnd = isRegular ? '' : addDays(startDate, MEMBERSHIP.days - 1);
   return {
     planId: plan.id,
     planName: plan.subtitle,
+    pricingType,
     drink,
     startDate,
     coworkingEnd,
     membershipEnd,
-    membershipName: MEMBERSHIP.name,
+    membershipName: isRegular ? '' : MEMBERSHIP.name,
     regularTotal,
     yourPrice,
     coupon,
@@ -94,6 +105,8 @@ const createBooking = async (customer, quote, payment) => {
   let space = null;
   if (quote.spaceId) space = await Space.findById(quote.spaceId).select('name spaceCode category').lean();
   const phone = String(customer.mobile || '').replace(/\D/g, '').slice(-10);
+  const isRegular = quote.pricingType === 'regular';
+
   const booking = await AllBooking.create({
     customerId: customer._id,
     customerName: String(customer.name || 'Customer').trim(),
@@ -108,8 +121,8 @@ const createBooking = async (customer, quote, payment) => {
     bookingDate: new Date(`${quote.startDate}T00:00:00.000Z`),
     startTime: '06:00',
     endTime: '24:00',
-    membershipType: 'Premium',
-    membershipDiscount: money(quote.regularTotal - quote.yourPrice),
+    membershipType: isRegular ? 'None' : 'Premium',
+    membershipDiscount: isRegular ? 0 : money(quote.regularTotal - quote.yourPrice),
     subTotal: quote.regularTotal,
     grandTotal: quote.payable,
     paidAmount: quote.payable,
@@ -117,12 +130,12 @@ const createBooking = async (customer, quote, payment) => {
     status: 'Upcoming',
     paymentStatus: 'full',
     notes: [
-      quote.membershipName,
-      `Membership ${pretty(quote.startDate)} – ${pretty(quote.membershipEnd)}`,
+      quote.membershipName || '',
+      quote.membershipName ? `Membership ${pretty(quote.startDate)} – ${pretty(quote.membershipEnd)}` : '',
       `Coworking ${pretty(quote.startDate)} – ${pretty(quote.coworkingEnd)}`,
       `Drink: ${quote.drink}`,
       payment.paymentId ? `Razorpay payment ${payment.paymentId}` : 'No payment due',
-    ].join('. '),
+    ].filter(Boolean).join('. '),
     payments: quote.payable > 0
       ? [{
           amount: quote.payable,
@@ -147,7 +160,7 @@ const publicBooking = (booking, quote) => ({
   startDate: quote?.startDate || '',
   coworkingEnd: quote?.coworkingEnd || '',
   membershipEnd: quote?.membershipEnd || '',
-  membershipName: quote?.membershipName || 'Premium Membership (365 Days)',
+  membershipName: quote?.membershipName || '',
   regularTotal: quote?.regularTotal ?? booking.subTotal,
   payable: booking.grandTotal,
   savings: quote?.savings ?? money((booking.subTotal || 0) - (booking.grandTotal || 0)),

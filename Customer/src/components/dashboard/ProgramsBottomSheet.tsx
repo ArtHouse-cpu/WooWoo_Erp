@@ -423,7 +423,7 @@ export function ProgramsBottomSheet({
       if (tab === "all") {
         navigate("/ourprograms", { replace: true });
       } else {
-        navigate(`/program/${tab}`, { replace: true });
+        navigate(`/ourprograms?tab=${tab}`, { replace: true });
       }
     }
   };

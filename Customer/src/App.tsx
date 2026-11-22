@@ -44,6 +44,8 @@ import SuppliesMarketplacePage from './app/supplies/SuppliesMarketplacePage';
 import PublicProductPage from './app/supplies/PublicProductPage';
 import SpacesMarketplacePage from './app/spaces/SpacesMarketplacePage';
 import PublicSpacePage from './app/spaces/PublicSpacePage';
+import CvpProgramPage from './app/programs/CvpProgramPage';
+import HapProgramPage from './app/programs/HapProgramPage';
 
 
 const queryClient = new QueryClient({
@@ -99,6 +101,7 @@ export default function App() {
                 {/* <Route path="/programs" element={<ProgramsPage />} /> */}
                 <Route path="/program/cap" element={<ProgramsPage />} />
                 <Route path="/ourprograms" element={<OurProgramsPage />} />
+                <Route path="/ourprograms/:tab" element={<OurProgramsPage />} />
                 <Route path="/program/csp" element={<ProgramsPage />} />
                 <Route path="/program/cvp" element={<OurProgramsPage defaultTab="cvp" />} />
                 <Route path="/program/hap" element={<OurProgramsPage defaultTab="hap" />} />
@@ -112,6 +115,7 @@ export default function App() {
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
                 <Route path="/supplies" element={<SuppliesMarketplacePage />} />
                 <Route path="/spaces" element={<SpacesMarketplacePage />} />
+                <Route path="/coworking" element={<Navigate to="/spaces?type=coworking" replace />} />
               </Route>
             </Route>
 
@@ -133,11 +137,14 @@ export default function App() {
             <Route path="/exhibition" element={<ExhibitionPage />} />
             <Route path="/supplies/product/:id" element={<PublicProductPage />} />
             <Route path="/spaces/space/:id" element={<PublicSpacePage />} />
+            <Route path="/coworking" element={<Navigate to="/spaces?type=coworking" replace />} />
             <Route path="/programs" element={<ProgramsPage />} />
             <Route path="/program" element={<ProgramsPage />} />
             <Route path="/program/csp" element={<ProgramsPage />} />
-            <Route path="/program/cvp" element={<OurProgramsPage defaultTab="cvp" />} />
-            <Route path="/program/hap" element={<OurProgramsPage defaultTab="hap" />} />
+            <Route path="/program/cvp" element={<CvpProgramPage />} />
+            <Route path="/program/hap" element={<HapProgramPage />} />
+            <Route path="/ourprograms" element={<OurProgramsPage />} />
+            <Route path="/ourprograms/:tab" element={<OurProgramsPage />} />
             <Route path="/program/:tab" element={<OurProgramsPage />} />
             <Route path="/programs/:tab" element={<OurProgramsPage />} />
             <Route path="*" element={<RootRedirect />} />

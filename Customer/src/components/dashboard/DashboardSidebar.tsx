@@ -85,7 +85,7 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
                   const Icon = item.icon;
                   const className = `flex h-12 w-full items-center gap-3 rounded-[14px] px-3 text-[14px] font-medium transition ${
                     active
-                      ? 'bg-[#EEF4FF] text-[#2563EB]'
+                      ? 'bg-[#F5F0FF] text-[#673DE6] font-semibold'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`;
 

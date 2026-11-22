@@ -36,6 +36,7 @@ const bodyOf = (input: {
   drink: string;
   couponCode?: string;
   spaceId?: string;
+  pricingType?: 'regular' | 'membership';
 }) => input;
 
 export async function quoteCoworkingBooking(input: {
@@ -44,6 +45,7 @@ export async function quoteCoworkingBooking(input: {
   drink: string;
   couponCode?: string;
   spaceId?: string;
+  pricingType?: 'regular' | 'membership';
 }) {
   const {data} = await api.post<Envelope<{
     payable: number;
@@ -61,6 +63,7 @@ export async function startCoworkingCheckout(input: {
   drink: string;
   couponCode?: string;
   spaceId?: string;
+  pricingType?: 'regular' | 'membership';
 }) {
   const {data} = await api.post<Envelope<
     | {mode: 'free'; booking: CoworkingReceipt}
@@ -98,10 +101,10 @@ export function downloadCoworkingInvoice(booking: CoworkingReceipt) {
   <div class="row"><strong>Space</strong><span>${booking.spaceName || 'Coworking'}</span></div>
   <div class="row"><strong>Start</strong><span>${booking.startDate || ''}</span></div>
   <div class="row"><strong>Coworking till</strong><span>${booking.coworkingEnd || ''}</span></div>
-  <div class="row"><strong>Membership till</strong><span>${booking.membershipEnd || ''}</span></div>
+  ${booking.membershipEnd ? `<div class="row"><strong>Membership till</strong><span>${booking.membershipEnd}</span></div>` : ''}
   <div class="row"><strong>Drink</strong><span>${booking.drink || ''}</span></div>
   <div class="row"><span>Regular price</span><span>${inr(booking.regularTotal)}</span></div>
-  <div class="row"><span>Savings</span><span>${inr(booking.savings)}</span></div>
+  ${booking.savings > 0 ? `<div class="row"><span>Savings</span><span>${inr(booking.savings)}</span></div>` : ''}
   <div class="paid"><span>Amount paid</span><span>${inr(booking.payable)}</span></div>
   <p>${booking.razorpayPaymentId ? `Razorpay ${booking.razorpayPaymentId}` : ''}</p>
 </body></html>`;

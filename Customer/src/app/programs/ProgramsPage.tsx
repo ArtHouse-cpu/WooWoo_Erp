@@ -615,9 +615,9 @@ const handleDeleteProduct = async (id: string, name: string) => {
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/ourprograms?tab=csp')}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
-              aria-label="Go back"
+              aria-label="Go back to CSP Programs"
             >
               <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
@@ -852,19 +852,19 @@ const handleDeleteProduct = async (id: string, name: string) => {
         </div>
 
         {/* ================= HORIZONTAL TABS ================= */}
-        <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-6 sm:gap-10">
+        <div className="mb-6 border-b border-gray-100 pb-3 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-6 sm:gap-10 min-w-max whitespace-nowrap">
             {/* Products Tab */}
             <button
               type="button"
               onClick={() => setActiveTab("products")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "products"
                   ? "text-orange-500"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <Package size={18} strokeWidth={activeTab === "products" ? 2.5 : 2} />
+              <Package size={18} strokeWidth={activeTab === "products" ? 2.5 : 2} className="shrink-0" />
               <span>Products</span>
             </button>
 
@@ -872,13 +872,13 @@ const handleDeleteProduct = async (id: string, name: string) => {
             <button
               type="button"
               onClick={() => setActiveTab("sales")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "sales"
                   ? "text-orange-500"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <ShoppingBag size={18} strokeWidth={activeTab === "sales" ? 2.5 : 2} />
+              <ShoppingBag size={18} strokeWidth={activeTab === "sales" ? 2.5 : 2} className="shrink-0" />
               <span>Sales</span>
             </button>
 
@@ -886,13 +886,13 @@ const handleDeleteProduct = async (id: string, name: string) => {
             <button
               type="button"
               onClick={() => setActiveTab("timeline")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "timeline"
                   ? "text-orange-500"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <BarChart2 size={18} strokeWidth={activeTab === "timeline" ? 2.5 : 2} />
+              <BarChart2 size={18} strokeWidth={activeTab === "timeline" ? 2.5 : 2} className="shrink-0" />
               <span>Timeline</span>
             </button>
           </div>
