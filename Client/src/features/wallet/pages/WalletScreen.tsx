@@ -1303,6 +1303,17 @@ export default function WalletScreen() {
                           <Plus size={14} className="text-emerald-600" />
                           <span>Add</span>
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            void handleWalletAction(row, "debit");
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                        >
+                          <Minus size={14} className="text-rose-600" />
+                          <span>Deduct</span>
+                        </button>
                       </Can>
 
                       <Can permission={PERMISSIONS.WALLET_MANAGE}>

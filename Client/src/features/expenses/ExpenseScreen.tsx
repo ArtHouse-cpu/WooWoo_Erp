@@ -805,7 +805,9 @@ export default function ExpenseScreen() {
 
   // Pagination (8 items per page)
   const [currentPage, setCurrentPage] = useState(1);
+  const [mobileVisible, setMobileVisible] = useState(8);
   const pageSize = 8;
+  const mobileSentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Action Menu dropdown
   const [actionMenuRowId, setActionMenuRowId] = useState<string | null>(null);
@@ -847,7 +849,8 @@ export default function ExpenseScreen() {
       const response = await handleGetAllExpences("", signal, 2000, fromDate, toDate);
       const list = Array.isArray(response?.expences) ? response.expences : [];
       setRows(list.map(mapExpenceToRow));
-    } catch (error) {
+    } catch (error: any) {
+      if (signal?.aborted || error?.code === "ERR_CANCELED" || error?.name === "CanceledError") return;
       console.log("Error fetching expenses:", error);
       setRows([]);
     } finally {
@@ -1037,6 +1040,30 @@ export default function ExpenseScreen() {
     return sortedData.slice(start, start + pageSize);
   }, [sortedData, currentPage, pageSize]);
 
+  const mobileRows = useMemo(
+    () => sortedData.slice(0, mobileVisible),
+    [sortedData, mobileVisible],
+  );
+
+  useEffect(() => {
+    setMobileVisible(pageSize);
+  }, [search, statusFilter, selectedTab, fromDate, toDate, sortBy]);
+
+  useEffect(() => {
+    const node = mobileSentinelRef.current;
+    if (!node || mobileVisible >= sortedData.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setMobileVisible((count) => Math.min(count + pageSize, sortedData.length));
+        }
+      },
+      { rootMargin: "240px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [mobileVisible, sortedData.length]);
+
   const startRecord = sortedData.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, sortedData.length);
 
@@ -1180,6 +1207,50 @@ export default function ExpenseScreen() {
     [expenseDraft],
   );
 
+  const dateFilterLabel =
+    datePreset === "custom" && fromDate && toDate
+      ? `${formatDisplayDate(fromDate)} – ${formatDisplayDate(toDate)}`
+      : DATE_PRESET_OPTIONS.find((p) => p.value === datePreset)?.label || "This Month";
+
+  const applyDatePreset = (preset: DatePreset) => {
+    setDatePreset(preset);
+    if (preset !== "custom") {
+      const range = rangeForPreset(preset);
+      setFromDate(range.from);
+      setToDate(range.to);
+    }
+    setCurrentPage(1);
+    setShowDateDropdown(false);
+  };
+
+  const customDateFields = datePreset === "custom" ? (
+    <div className="flex items-center gap-1.5">
+      <input
+        type="date"
+        value={fromDate}
+        max={toDate || undefined}
+        onChange={(event) => {
+          setFromDate(event.target.value);
+          setCurrentPage(1);
+        }}
+        aria-label="From date"
+        className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-500"
+      />
+      <span className="text-xs text-slate-400">to</span>
+      <input
+        type="date"
+        value={toDate}
+        min={fromDate || undefined}
+        onChange={(event) => {
+          setToDate(event.target.value);
+          setCurrentPage(1);
+        }}
+        aria-label="To date"
+        className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-500"
+      />
+    </div>
+  ) : null;
+
   const modalInitialExpense = useMemo(
     () =>
       modalMode === "create"
@@ -1210,8 +1281,8 @@ export default function ExpenseScreen() {
               className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer"
             >
               <Calendar className="h-3.5 w-3.5 text-slate-500" />
-              <span>
-                {DATE_PRESET_OPTIONS.find((p) => p.value === datePreset)?.label || "This Month"}
+              <span className="max-w-[9rem] truncate">
+                {dateFilterLabel}
               </span>
               <ChevronDown className="h-3 w-3 text-slate-400" />
             </button>
@@ -1222,16 +1293,7 @@ export default function ExpenseScreen() {
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => {
-                      const preset = opt.value as DatePreset;
-                      setDatePreset(preset);
-                      if (preset !== "custom") {
-                        const range = rangeForPreset(preset);
-                        setFromDate(range.from);
-                        setToDate(range.to);
-                      }
-                      setShowDateDropdown(false);
-                    }}
+                    onClick={() => applyDatePreset(opt.value)}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-left transition-colors ${
                       datePreset === opt.value
                         ? "bg-blue-50 text-blue-600 font-semibold"
@@ -1258,6 +1320,10 @@ export default function ExpenseScreen() {
           </Can>
         </div>
       </div>
+
+      {datePreset === "custom" ? (
+        <div className="md:hidden">{customDateFields}</div>
+      ) : null}
 
       {/* ── 3. Category / Segment Tabs Bar (Desktop only) ─────────── */}
       <div className="hidden md:flex hide-scrollbar items-center gap-2 overflow-x-auto border-b border-slate-200 pb-2.5 pt-2">
@@ -1622,7 +1688,8 @@ export default function ExpenseScreen() {
         </div>
 
         {/* Right Action Tools */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex flex-wrap items-center justify-end gap-2 self-end sm:self-auto">
+          {customDateFields}
           {/* Date Range Selector */}
           <div className="relative" ref={desktopDateDropdownRef}>
             <button
@@ -1635,8 +1702,8 @@ export default function ExpenseScreen() {
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors cursor-pointer"
             >
               <Calendar className="h-3.5 w-3.5 text-slate-500" />
-              <span>
-                {DATE_PRESET_OPTIONS.find((p) => p.value === datePreset)?.label || "This Month"}
+              <span className="max-w-[14rem] truncate">
+                {dateFilterLabel}
               </span>
               <ChevronDown className="h-3 w-3 text-slate-400" />
             </button>
@@ -1647,16 +1714,7 @@ export default function ExpenseScreen() {
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => {
-                      const preset = opt.value as DatePreset;
-                      setDatePreset(preset);
-                      if (preset !== "custom") {
-                        const range = rangeForPreset(preset);
-                        setFromDate(range.from);
-                        setToDate(range.to);
-                      }
-                      setShowDateDropdown(false);
-                    }}
+                    onClick={() => applyDatePreset(opt.value)}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-left transition-colors ${
                       datePreset === opt.value
                         ? "bg-blue-50 text-blue-600 font-semibold"
@@ -1905,7 +1963,7 @@ export default function ExpenseScreen() {
                 />
               ))}
             </div>
-          ) : paginatedData.length === 0 ? (
+          ) : mobileRows.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
               <h4 className="text-sm font-semibold text-slate-800">No expenses found</h4>
               <p className="mt-1 text-xs text-slate-500">
@@ -1915,7 +1973,7 @@ export default function ExpenseScreen() {
               </p>
             </div>
           ) : (
-            paginatedData.map((row) => {
+            mobileRows.map((row) => {
               const catColor =
                 CATEGORY_COLORS[row.category] ||
                 CATEGORY_COLORS[row.segment] || {
@@ -2074,6 +2132,11 @@ export default function ExpenseScreen() {
               );
             })
           )}
+          {!loading && mobileRows.length > 0 && mobileRows.length < sortedData.length ? (
+            <div ref={mobileSentinelRef} className="py-3 text-center text-xs font-medium text-slate-400">
+              Loading more expenses…
+            </div>
+          ) : null}
         </div>
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full border-collapse text-left text-sm">
@@ -2262,7 +2325,7 @@ export default function ExpenseScreen() {
         </div>
 
         {/* ── 6. Pagination Bar ──────────────────────────────────────── */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3.5 border-t border-slate-100 text-xs text-slate-500">
+        <div className="hidden flex-col gap-3 px-4 py-3.5 border-t border-slate-100 text-xs text-slate-500 md:flex md:flex-row md:items-center md:justify-between">
           <div>
             Showing{" "}
             <span className="font-semibold text-slate-700">

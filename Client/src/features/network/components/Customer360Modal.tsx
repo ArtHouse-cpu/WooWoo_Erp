@@ -179,10 +179,16 @@ export default function Customer360Modal({
   }, [actionsOpen]);
 
   useEffect(() => {
+    const id = String(customerId || "").trim();
+    if (!id || id === "undefined") {
+      setLoading(false);
+      setError("This customer has no id, so the 360 view cannot load.");
+      return;
+    }
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    void handleGetCustomer360(customerId, controller.signal)
+    void handleGetCustomer360(id, controller.signal)
       .then((response) => setData(response))
       .catch((err: { name?: string; response?: { data?: { message?: string } } }) => {
         if (err?.name === "CanceledError" || err?.name === "AbortError") return;

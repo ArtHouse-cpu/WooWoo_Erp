@@ -830,8 +830,8 @@ export function ProgramsBottomSheet({
     <>
       <AnimatePresence>
         {(asPage || isOpen) && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center">
-            {/* Backdrop Overlay */}
+          <div className={asPage ? "min-h-dvh bg-[#F6F5FB] md:flex md:justify-center md:px-6 md:py-6" : "fixed inset-0 z-50 flex items-end justify-center"}>
+            {asPage ? null : (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -839,19 +839,24 @@ export function ProgramsBottomSheet({
               onClick={onClose}
               className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
             />
+            )}
 
-            {/* Bottom Sheet Panel with dynamic content-driven height */}
             <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
+              initial={asPage ? { opacity: 0 } : { y: "100%" }}
+              animate={asPage ? { opacity: 1 } : { y: 0 }}
+              exit={asPage ? { opacity: 0 } : { y: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 240 }}
-              className="relative z-10 flex max-h-[90dvh] h-auto w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
+              className={
+                asPage
+                  ? "relative flex h-dvh w-full max-w-3xl flex-col overflow-hidden bg-white md:h-[calc(100dvh-3rem)] md:rounded-[32px] md:border md:border-slate-100 md:shadow-sm"
+                  : "relative z-10 flex max-h-[90dvh] h-auto w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
+              }
             >
-              {/* Top Drag Handle */}
+              {asPage ? null : (
               <div className="flex shrink-0 justify-center py-2.5">
                 <div className="h-1.5 w-12 rounded-full bg-[#E5E7EB]" />
               </div>
+              )}
 
               {/* Header Info */}
               <div className="relative shrink-0 px-5 pb-3 flex items-center justify-between">
@@ -940,7 +945,7 @@ export function ProgramsBottomSheet({
               </div>
 
               {/* Scrollable Contents - Non-rigid content-driven height */}
-              <div className={`min-h-0 overflow-y-auto flex-initial ${activeTab === "all" ? "pb-2" : "pb-5"} [scrollbar-gutter:stable]`}>
+              <div className={`min-h-0 overflow-y-auto ${asPage ? "flex-1" : "flex-initial"} ${activeTab === "all" ? "pb-2" : "pb-5"} [scrollbar-gutter:stable]`}>
                 {activeTab === "all" ? (
                   /* ALL PROGRAMS OVERVIEW TAB */
                   <div className="space-y-3 px-4 sm:px-5 pb-1 text-left">

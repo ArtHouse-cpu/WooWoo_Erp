@@ -12,6 +12,7 @@ import {
   saveBookingPaymentRule,
 } from '../services/bookingPaymentSettings.service.js';
 import {refundableAmount} from '../utils/bookingPayment.js';
+import {computeBookingStatus} from './spaceBooking.controller.js';
 
 const REFUND_STATUSES = new Set(['Pending', 'Processing', 'Completed', 'Failed']);
 const SORTS = new Set([
@@ -134,7 +135,7 @@ const mapBooking = (doc, source, catalogue) => {
     paidAmount: paid,
     dueAmount: due,
     paymentStatus: displayPaymentStatus(doc),
-    bookingStatus: doc.status || 'Upcoming',
+    bookingStatus: computeBookingStatus(doc),
     cancellation: doc.cancellation || null,
     cancellationHistory: Array.isArray(doc.cancellationHistory) ? doc.cancellationHistory : [],
     refund: {

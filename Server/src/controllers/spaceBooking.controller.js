@@ -15,8 +15,10 @@ import {
   findBusyIntervals,
   getAvailabilityRangeError,
   intervalKey,
+  isDateKey,
   nowInBusinessTz,
   resolveSpaceGroup,
+  toDateKey,
   validateAndPersistSchedule,
 } from '../services/spaceBookingAvailability.service.js';
 import {bookingPaymentError} from '../utils/bookingPayment.js';
@@ -69,6 +71,67 @@ const bookingPaymentRejection = async (record, requestBody) => {
   });
 };
 
+const MONTH_NUM = {
+  jan: '01',
+  feb: '02',
+  mar: '03',
+  apr: '04',
+  may: '05',
+  jun: '06',
+  jul: '07',
+  aug: '08',
+  sep: '09',
+  oct: '10',
+  nov: '11',
+  dec: '12',
+};
+
+const prettyDateKey = text => {
+  const match = String(text || '').match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/);
+  if (!match) return null;
+  const month = MONTH_NUM[match[2].slice(0, 3).toLowerCase()];
+  if (!month) return null;
+  const key = `${match[3]}-${month}-${String(match[1]).padStart(2, '0')}`;
+  return isDateKey(key) ? key : null;
+};
+
+const isBookingRecord = value =>
+  Boolean(value) &&
+  typeof value === 'object' &&
+  !(value instanceof Date) &&
+  ('bookingDate' in value ||
+    'startTime' in value ||
+    'status' in value ||
+    'multiDateSlots' in value);
+
+/**
+ * A coworking pass is stored as the first day plus 06:00–24:00. The booked
+ * span is the Coworking date range in the notes, or the saved coworking dates.
+ */
+const withBookedSpan = booking => {
+  const next = {...booking};
+  const note = String(booking.notes || '');
+  const match = note.match(/Coworking\s+(.+?)\s+[–-]\s+(.+?)(?:\.|$)/);
+  const start = match ? prettyDateKey(match[1]) : null;
+  const end = match ? prettyDateKey(match[2]) : null;
+  const hasCoworkingDates = booking.coworkingStartDate && booking.coworkingEndDate;
+  if ((start && end && end >= start) || hasCoworkingDates) {
+    next.summarySnapshot = {...(booking.summarySnapshot || {}), isDurationPlan: true};
+    if (start && end && end >= start) {
+      next.coworkingStartDate = start;
+      next.coworkingEndDate = end;
+    }
+    if (!next.startTime) next.startTime = '06:00';
+    if (!next.endTime) next.endTime = '24:00';
+  }
+  return next;
+};
+
+/**
+ * Upcoming before the booked date/hours, Ongoing during them, Expired after.
+ * Cancelled and Draft stay as saved. `now` is read in the booking timezone.
+ * Pass a booking document, or (bookingDate, startTime, endTime, status, now).
+ */
 export const computeBookingStatus = (
   bookingDate,
   startTime,
@@ -76,58 +139,34 @@ export const computeBookingStatus = (
   currentStatus,
   now = new Date(),
 ) => {
-  if (currentStatus === 'Cancelled') {
-    return 'Cancelled';
-  }
-  if (currentStatus === 'Draft') {
-    return 'Draft';
-  }
+  const record = isBookingRecord(bookingDate);
+  const booking = record
+    ? bookingDate
+    : {bookingDate, startTime, endTime, status: currentStatus};
+  const clock = record && startTime instanceof Date ? startTime : now;
+  const saved = String(booking.status || (!record ? currentStatus : '') || 'Upcoming');
+  if (saved === 'Cancelled' || saved === 'Draft') return saved;
 
-  if (!bookingDate || !startTime || !endTime) {
-    return currentStatus || 'Upcoming';
-  }
+  const nowParts = nowInBusinessTz(clock instanceof Date ? clock : new Date());
+  const {intervals} = buildBookingIntervals(withBookedSpan(booking));
 
-  let year, month, day;
-  if (typeof bookingDate === 'string') {
-    const m = bookingDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) {
-      year = Number(m[1]);
-      month = Number(m[2]) - 1;
-      day = Number(m[3]);
-    } else {
-      const d = new Date(bookingDate);
-      if (Number.isNaN(d.getTime())) return currentStatus || 'Upcoming';
-      year = d.getFullYear();
-      month = d.getMonth();
-      day = d.getDate();
-    }
-  } else if (bookingDate instanceof Date) {
-    if (Number.isNaN(bookingDate.getTime())) return currentStatus || 'Upcoming';
-    year = bookingDate.getFullYear();
-    month = bookingDate.getMonth();
-    day = bookingDate.getDate();
-  } else {
-    return currentStatus || 'Upcoming';
+  if (!intervals.length) {
+    const key = toDateKey(booking.bookingDate);
+    if (!key) return saved === 'Ongoing' || saved === 'Expired' ? saved : 'Upcoming';
+    if (key > nowParts.dateKey) return 'Upcoming';
+    if (key < nowParts.dateKey) return 'Expired';
+    return 'Ongoing';
   }
 
-  const [sH, sM] = String(startTime).split(':').map(Number);
-  const [eH, eM] = String(endTime).split(':').map(Number);
-  if (
-    Number.isNaN(sH) ||
-    Number.isNaN(sM) ||
-    Number.isNaN(eH) ||
-    Number.isNaN(eM)
-  ) {
-    return currentStatus || 'Upcoming';
-  }
+  const active = intervals.some(
+    iv => iv.date === nowParts.dateKey && iv.start <= nowParts.minutes && nowParts.minutes < iv.end,
+  );
+  if (active) return 'Ongoing';
 
-  const start = new Date(year, month, day, sH, sM, 0, 0);
-  const end = new Date(year, month, day, eH, eM, 0, 0);
-  const nowMs = now.getTime();
-
-  if (nowMs < start.getTime()) return 'Upcoming';
-  if (nowMs < end.getTime()) return 'Ongoing';
-  return 'Expired';
+  const stillToCome = intervals.some(
+    iv => iv.date > nowParts.dateKey || (iv.date === nowParts.dateKey && nowParts.minutes < iv.end),
+  );
+  return stillToCome ? 'Upcoming' : 'Expired';
 };
 
 export const syncBookingStatuses = async () => {
@@ -135,19 +174,15 @@ export const syncBookingStatuses = async () => {
     const now = new Date();
     const activeBookings = await SpaceBooking.find({
       status: { $in: ['Upcoming', 'Ongoing'] },
-    }).select('_id bookingDate startTime endTime status');
+    }).select(
+      '_id bookingDate startTime endTime status dateMode multiDateSlots coworkingStartDate coworkingEndDate summarySnapshot notes',
+    );
 
     if (!activeBookings || activeBookings.length === 0) return;
 
     const bulkOps = [];
     for (const b of activeBookings) {
-      const newStatus = computeBookingStatus(
-        b.bookingDate,
-        b.startTime,
-        b.endTime,
-        b.status,
-        now,
-      );
+      const newStatus = computeBookingStatus(b, now);
       if (newStatus !== b.status) {
         bulkOps.push({
           updateOne: {

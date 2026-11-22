@@ -24,6 +24,7 @@ import {
   ChevronRight,
   ChevronsRight,
   Check,
+  Minus,
   MoreVertical,
 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -42,7 +43,10 @@ import {
   handleCreateCustomer,
   handleDeleteCustomer,
   handleGetCustomers,
+  handleGetWalletById,
+  handleGetWalletInstructions,
   handleUpdateCustomer,
+  handleUpdateWallet,
   type CustomerPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
@@ -66,6 +70,10 @@ type CustomerRow = {
   createdBy?: { m_staff_name?: string | null };
   closingBalance?: number;
   walletAmount?: number;
+  withdrawable?: number;
+  nonWithdrawable?: number;
+  affiliateBalance?: number;
+  cashbackBalance?: number;
   profileImage?: string;
   dueAmount?: number;
 };
@@ -360,6 +368,136 @@ export default function CustomerScreen() {
           icon: "error",
         });
       }
+    }
+  };
+
+  const handleDeductWallet = async (customer: CustomerRow) => {
+    const customerId = String(customer._id || "").trim();
+    if (!customerId) return;
+    setActionMenuCustomerId(null);
+
+    let withdrawable = Number(customer.withdrawable ?? customer.affiliateBalance ?? 0) || 0;
+    let nonWithdrawable = Number(customer.nonWithdrawable ?? customer.cashbackBalance ?? 0) || 0;
+    let totalAvailable = Number(customer.walletAmount ?? 0) || 0;
+    if (withdrawable + nonWithdrawable > 0) {
+      totalAvailable = Math.round((withdrawable + nonWithdrawable) * 100) / 100;
+    }
+
+    try {
+      const walletResponse = await handleGetWalletById(customerId);
+      const wallet = walletResponse?.wallet;
+      if (wallet) {
+        withdrawable = Number(wallet.withdrawable ?? withdrawable) || 0;
+        nonWithdrawable = Number(wallet.nonWithdrawable ?? nonWithdrawable) || 0;
+        totalAvailable = Number(wallet.walletAmount ?? wallet.totalBalance ?? totalAvailable) || 0;
+      }
+    } catch {
+      // Fall back to the amounts already on the customer row.
+    }
+
+    let minimumBalance = 0;
+    try {
+      const instructions = await handleGetWalletInstructions();
+      minimumBalance = Math.max(
+        0,
+        Number(instructions?.minimumBalance ?? instructions?.instructions?.minimumBalance ?? 0) || 0,
+      );
+    } catch {
+      minimumBalance = 0;
+    }
+
+    const safeName = String(customer.name || "Customer")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    const result = await Swal.fire({
+      title: '<h2 class="text-xl font-bold text-slate-800">Deduct Wallet Amount</h2>',
+      html: `
+        <div class="flex flex-col gap-4 text-left mt-2">
+          <div class="text-sm text-slate-500">
+            Customer: <strong class="text-slate-700">${safeName}</strong>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1.5">
+            <div class="flex justify-between"><span class="text-slate-500">Total</span><span class="font-semibold">₹ ${totalAvailable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Withdrawable</span><span class="font-semibold text-emerald-700">₹ ${withdrawable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Non-Withdrawable</span><span class="font-semibold text-slate-800">₹ ${nonWithdrawable.toLocaleString("en-IN")}</span></div>
+          </div>
+          <p class="text-[11px] text-slate-500">
+            Debit uses the combined balance. Non-withdrawable is deducted first, then withdrawable.
+          </p>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Amount (₹) <span class="text-red-500">*</span></label>
+            <input id="wallet-amount" type="number" min="0" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="Enter amount..." />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Note / Remark</label>
+            <input id="wallet-note" type="text" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="E.g., Cash added, Service refund..." />
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: "Deduct",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#64748b",
+      customClass: {
+        popup: "rounded-2xl",
+        confirmButton: "px-6 py-2.5 rounded-lg font-semibold",
+        cancelButton: "px-6 py-2.5 rounded-lg font-semibold",
+      },
+      preConfirm: () => {
+        const amountInput = document.getElementById("wallet-amount") as HTMLInputElement | null;
+        const noteInput = document.getElementById("wallet-note") as HTMLInputElement | null;
+        const amount = Number(amountInput?.value ?? 0);
+        const note = String(noteInput?.value ?? "").trim();
+        if (!Number.isFinite(amount) || amount <= 0) {
+          Swal.showValidationMessage("Enter a valid amount.");
+          return undefined;
+        }
+        if (amount > totalAvailable + 0.001) {
+          Swal.showValidationMessage(
+            `Insufficient wallet balance. Available ₹ ${totalAvailable.toLocaleString("en-IN")}.`,
+          );
+          return undefined;
+        }
+        if (totalAvailable - amount < minimumBalance) {
+          Swal.showValidationMessage(
+            `Final wallet balance cannot be less than minimum balance ₹ ${minimumBalance.toLocaleString("en-IN")}.`,
+          );
+          return undefined;
+        }
+        return { amount, note };
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    try {
+      await handleUpdateWallet(customerId, {
+        type: "debit",
+        amount: result.value.amount,
+        note: result.value.note,
+        walletType: "nonWithdrawable",
+        minimumBalance,
+        customerId,
+        customerName: customer.name,
+        customerPhone: customer.mobile,
+        createdBy: {
+          m_staff_id: staff?.m_staff_id,
+          m_staff_name: staff?.m_staff_name,
+          m_staff_email: staff?.m_staff_email,
+        },
+      });
+      await fetchCustomers();
+      await Swal.fire("Updated", "Wallet amount deducted successfully.", "success");
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Wallet update failed",
+        err?.response?.data?.message ?? "Could not deduct this wallet amount.",
+        "error",
+      );
     }
   };
 
@@ -1209,6 +1347,20 @@ export default function CustomerScreen() {
                               </button>
                             </Can>
 
+                            <Can permission={PERMISSIONS.WALLET_MANAGE}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleDeductWallet(customer);
+                                }}
+                                title="Deduct from wallet"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
+                              >
+                                <Minus size={14} />
+                              </button>
+                            </Can>
+
                             {/* Delete Customer */}
                             <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
                               <button
@@ -1586,6 +1738,19 @@ export default function CustomerScreen() {
                               <span>Edit Customer</span>
                             </button>
                           </Can>
+                          <Can permission={PERMISSIONS.WALLET_MANAGE}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeductWallet(customer);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <Minus size={14} className="text-rose-500" />
+                              <span>Deduct from wallet</span>
+                            </button>
+                          </Can>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1670,17 +1835,16 @@ export default function CustomerScreen() {
         />
       )}
 
-      {editOpen && selectedCustomer && (
-        <UpdateCustomerModal
-          customer={selectedCustomer}
-          onClose={() => {
-            setEditOpen(false);
-            setSelectedCustomer(null);
-          }}
-          onSubmit={handleUpdateCustomerSubmit}
-          loading={updatingCustomer}
-        />
-      )}
+      <UpdateCustomerModal
+        open={editOpen && Boolean(selectedCustomer)}
+        customer={(selectedCustomer as CustomerPayload | null) ?? null}
+        onClose={() => {
+          setEditOpen(false);
+          setSelectedCustomer(null);
+        }}
+        onUpdate={handleUpdateCustomerSubmit}
+        loading={updatingCustomer}
+      />
 
       {detailsOpen && detailsCustomer && (
         <CustomerDetailsModal
@@ -1692,11 +1856,11 @@ export default function CustomerScreen() {
         />
       )}
 
-      {customer360 && (
+      {customer360?._id && (
         <Customer360Modal
-          customer={customer360}
+          customerId={String(customer360._id)}
+          customerName={customer360.name}
           onClose={() => setCustomer360(null)}
-          onChanged={() => void fetchCustomers()}
         />
       )}
 

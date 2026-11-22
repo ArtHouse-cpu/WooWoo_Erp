@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export type ManualDiscountType = "flat" | "percentage";
 
 type Props = {
@@ -75,6 +77,7 @@ export default function PurchaseSummaryCard({
   const isCreditView =
     String(paymentInfo?.purchaseType ?? "").toLowerCase() === "credit" ||
     String(paymentInfo?.status ?? "").toLowerCase() === "due";
+  const inDialog = useInsideDialog();
   const paidDisplay = Math.max(0, Number(paymentInfo?.paidAmount) || 0);
   const dueDisplay = isCreditView
     ? Math.max(
@@ -85,8 +88,33 @@ export default function PurchaseSummaryCard({
       )
     : Math.max(0, Number(paymentInfo?.dueAmount) || 0);
 
+  const actionButtons = (
+    <div className={`grid gap-2 ${onCredit ? "grid-cols-2" : "grid-cols-1"}`}>
+      {onCredit ? (
+        <button
+          type="button"
+          onClick={onCredit}
+          disabled={isSaving}
+          className="w-full rounded-md border border-amber-300 bg-amber-50 px-2 py-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60 sm:px-3 sm:text-sm"
+          title="Purchase now, pay later — full amount stays Due"
+        >
+          {isSaving ? "Saving..." : creditLabel}
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={isSaving}
+        className="w-full rounded-md bg-blue-600 px-2 py-2.5 text-xs font-semibold text-white disabled:opacity-60 sm:px-3 sm:text-sm"
+      >
+        {isSaving ? "Saving..." : saveLabel}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-4">
+    <div className="lg:col-span-4">
+    <div className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm ${readOnly ? "" : "max-lg:mb-20"}`}>
       <h3 className="mb-3 text-sm font-semibold text-gray-800">{title}</h3>
       <div className="space-y-2 text-sm">
         <div className="flex items-center justify-between text-gray-600">
@@ -207,33 +235,28 @@ export default function PurchaseSummaryCard({
           </div>
         ) : null}
       </div>
-      {!readOnly && (
-        <div
-          className={`mt-4 grid gap-2 ${
-            onCredit ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
-          }`}
-        >
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={isSaving}
-            className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {isSaving ? "Saving..." : saveLabel}
-          </button>
-          {onCredit ? (
-            <button
-              type="button"
-              onClick={onCredit}
-              disabled={isSaving}
-              className="w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-              title="Purchase now, pay later — full amount stays Due"
-            >
-              {isSaving ? "Saving..." : creditLabel}
-            </button>
-          ) : null}
-        </div>
-      )}
+      {!readOnly && <div className="mt-4 hidden lg:block">{actionButtons}</div>}
+    </div>
+    {!readOnly && (
+      <div
+        className={`fixed inset-x-0 z-[80] border-t border-gray-200 bg-white/95 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md lg:hidden ${
+          inDialog
+            ? "bottom-0 pb-[max(0.625rem,env(safe-area-inset-bottom))]"
+            : "bottom-[calc(3.75rem+env(safe-area-inset-bottom))] md:bottom-0 md:pb-[max(0.625rem,env(safe-area-inset-bottom))]"
+        }`}
+      >
+        {actionButtons}
+      </div>
+    )}
     </div>
   );
+}
+
+/** Create Purchase opens both as a page and inside a full-screen dialog. */
+function useInsideDialog() {
+  const [inside, setInside] = useState(false);
+  useEffect(() => {
+    setInside(Boolean(document.querySelector('[role="dialog"]')));
+  }, []);
+  return inside;
 }
