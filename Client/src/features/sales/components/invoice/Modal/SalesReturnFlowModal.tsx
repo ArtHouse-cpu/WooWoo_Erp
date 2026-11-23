@@ -5,6 +5,8 @@ import {
   CreditCard,
   Gift,
   Loader2,
+  Minus,
+  Plus,
   Smartphone,
   Wallet,
   X,
@@ -382,27 +384,75 @@ export default function SalesReturnFlowModal({
                             </p>
                           ) : null}
                           <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                            <label className="text-[11px] font-semibold text-slate-600">
+                            <div className="text-[11px] font-semibold text-slate-600">
                               Return qty
-                              <input
-                                type="number"
-                                min={0}
-                                max={line.remainingQty}
-                                disabled={disabled || !line.selected}
-                                value={line.selected ? line.returnQty : 0}
-                                onChange={e => {
-                                  const qty = Number(e.target.value) || 0;
-                                  setLines(prev =>
-                                    prev.map(item =>
-                                      item.lineIndex === line.lineIndex
-                                        ? withUpdatedQty({...item, selected: qty > 0}, qty)
-                                        : item,
-                                    ),
-                                  );
-                                }}
-                                className="mt-1 w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm font-bold text-slate-900 disabled:bg-slate-50"
-                              />
-                            </label>
+                              <div className="mt-1 inline-flex items-center rounded-lg border border-slate-200 bg-white">
+                                <button
+                                  type="button"
+                                  aria-label={`Decrease return quantity for ${line.productName}`}
+                                  disabled={disabled || !line.selected || line.returnQty <= 1}
+                                  onClick={() =>
+                                    setLines(prev =>
+                                      prev.map(item =>
+                                        item.lineIndex === line.lineIndex
+                                          ? withUpdatedQty(item, item.returnQty - 1)
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                  className="flex h-9 w-9 items-center justify-center text-slate-700 disabled:text-slate-300"
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </button>
+                                <input
+                                  type="number"
+                                  min={line.selected ? 1 : 0}
+                                  max={line.remainingQty}
+                                  disabled={disabled || !line.selected}
+                                  value={line.selected ? line.returnQty : 0}
+                                  onChange={e => {
+                                    const qty = Number(e.target.value) || 0;
+                                    setLines(prev =>
+                                      prev.map(item =>
+                                        item.lineIndex === line.lineIndex
+                                          ? withUpdatedQty(
+                                              {...item, selected: qty > 0},
+                                              qty,
+                                            )
+                                          : item,
+                                      ),
+                                    );
+                                  }}
+                                  className="h-9 w-12 border-x border-slate-200 bg-transparent text-center text-sm font-bold text-slate-900 outline-none [appearance:textfield] disabled:bg-slate-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                />
+                                <button
+                                  type="button"
+                                  aria-label={`Increase return quantity for ${line.productName}`}
+                                  disabled={
+                                    disabled ||
+                                    !line.selected ||
+                                    line.returnQty >= line.remainingQty
+                                  }
+                                  onClick={() =>
+                                    setLines(prev =>
+                                      prev.map(item =>
+                                        item.lineIndex === line.lineIndex
+                                          ? withUpdatedQty(item, item.returnQty + 1)
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                  className="flex h-9 w-9 items-center justify-center text-slate-700 disabled:text-slate-300"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </button>
+                              </div>
+                              {line.remainingQty > 1 ? (
+                                <p className="mt-1 font-medium text-slate-400">
+                                  Up to {line.remainingQty}
+                                </p>
+                              ) : null}
+                            </div>
                             <p className="text-right text-sm font-extrabold text-slate-900">
                               {line.isGift ? (
                                 <span className="text-pink-600">Gift · ₹0</span>
