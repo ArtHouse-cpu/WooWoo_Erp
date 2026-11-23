@@ -118,32 +118,32 @@ const calcDurationHours = (from: string, to: string) => {
   return Math.max(0.5, Math.round(((endM - startM) / 60) * 10) / 10);
 };
 
-/** Formats 24-hr "HH:MM" into 12-hr AM/PM format (e.g. "09:00 AM") */
+/** Formats 24-hr "HH:MM" into 12-hr AM/PM format (e.g. "08:00 AM") */
 const formatTimeSlotDisplay = (time24: string) => {
-  if (!time24) return '06:00 AM';
+  if (!time24) return '08:00 AM';
   const [hStr, mStr] = time24.split(':');
   let h = Number(hStr);
   const m = Number(mStr) || 0;
-  if (Number.isNaN(h)) h = 6;
+  if (Number.isNaN(h)) h = 8;
   if (h === 24) h = 0;
   const period = h >= 12 ? 'PM' : 'AM';
   const displayH = h % 12 === 0 ? 12 : h % 12;
   return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-/** Generates quick slot presets for the given duration */
+/** Generates quick slot presets for the given duration within 08:00 AM – 10:00 PM */
 const getQuickSlotsForDuration = (hours: number) => {
-  const dur = Math.max(1, Math.min(18, Math.round(hours || 1)));
+  const dur = Math.max(1, Math.min(14, Math.round(hours || 1)));
   const slots: {label: string; start: string; end: string}[] = [];
-  const candidateStarts = [9, 12, 15, 18, 20].filter(s => s + dur <= 24);
-  if (candidateStarts.length === 0 && 6 + dur <= 24) {
-    candidateStarts.push(6);
+  const candidateStarts = [8, 11, 14, 17, 19].filter(s => s + dur <= 22);
+  if (candidateStarts.length === 0 && 8 + dur <= 22) {
+    candidateStarts.push(8);
   }
 
   candidateStarts.forEach(startH => {
     const endH = startH + dur;
     const startStr = `${String(startH).padStart(2, '0')}:00`;
-    const endStr = endH === 24 ? '24:00' : `${String(endH).padStart(2, '0')}:00`;
+    const endStr = `${String(endH).padStart(2, '0')}:00`;
     slots.push({
       label: `${formatTimeSlotDisplay(startStr)} – ${formatTimeSlotDisplay(endStr)}`,
       start: startStr,
@@ -168,8 +168,8 @@ export function SpaceBookingModal({
   const [guestCount, setGuestCount] = useState<number>(15);
   const [bookingDate, setBookingDate] = useState<string>('');
   const [durationHours, setDurationHours] = useState(3);
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('12:00');
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('11:00');
 
   // Additional options
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -184,8 +184,8 @@ export function SpaceBookingModal({
     setCustomPurpose('');
     setGuestCount(space.capacity > 0 ? Math.min(space.capacity, 15) : 15);
     setBookingDate(toIsoDate(initialDate));
-    const sTime = initialStartTime || '09:00';
-    const eTime = initialEndTime || '12:00';
+    const sTime = initialStartTime || '08:00';
+    const eTime = initialEndTime || '11:00';
     setStartTime(sTime);
     setEndTime(eTime);
     const dur = calcDurationHours(sTime, eTime);
@@ -269,12 +269,12 @@ export function SpaceBookingModal({
     setStartTime(newStart);
     if (!newStart) return;
 
-    const [sh = 6, sm = 0] = newStart.split(':').map(Number);
+    const [sh = 8, sm = 0] = newStart.split(':').map(Number);
     const startM = sh * 60 + sm;
     let endM = startM + Math.round(durationHours * 60);
 
-    if (endM > 24 * 60) {
-      endM = 24 * 60;
+    if (endM > 22 * 60) {
+      endM = 22 * 60;
       const dur = Math.max(0.5, Math.round(((endM - startM) / 60) * 10) / 10);
       setDurationHours(dur);
     }
@@ -282,7 +282,7 @@ export function SpaceBookingModal({
     const endH = Math.floor(endM / 60);
     const endMin = endM % 60;
     setEndTime(
-      `${String(endH === 24 ? '24' : endH).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
+      `${String(endH).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
     );
   };
 
@@ -664,8 +664,8 @@ export function SpaceBookingModal({
                   <div className="relative">
                     <input
                       type="time"
-                      min="06:00"
-                      max="23:59"
+                      min="08:00"
+                      max="22:00"
                       value={startTime}
                       onChange={e => handleStartTimeChange(e.target.value)}
                       className="w-full h-10 px-3 text-[10px] sm:text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer shadow-2xs"
@@ -679,9 +679,9 @@ export function SpaceBookingModal({
                   <div className="relative">
                     <input
                       type="time"
-                      min="06:00"
-                      max="23:59"
-                      value={endTime === '24:00' ? '00:00' : endTime}
+                      min="08:00"
+                      max="22:00"
+                      value={endTime === '24:00' ? '22:00' : endTime}
                       onChange={e => handleEndTimeChange(e.target.value)}
                       className="w-full h-10 px-3 text-[10px] sm:text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer shadow-2xs"
                       title="End Time"
@@ -715,7 +715,7 @@ export function SpaceBookingModal({
 
                 {!isValidTimeRange && (
                   <p className="mt-1 text-xs font-semibold text-rose-500">
-                    End time must be at least 1 hour after start time.
+                    End time must be at least 1 hour after start time (within 08:00 AM – 10:00 PM).
                   </p>
                 )}
 

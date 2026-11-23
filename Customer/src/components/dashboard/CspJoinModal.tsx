@@ -26,6 +26,7 @@ import {
 type CspJoinModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  onSubmitted?: (application?: CspApplication) => void;
 };
 
 // Available categories for search & multi-select
@@ -152,7 +153,7 @@ const PLATFORMS: PlatformOption[] = [
   },
 ];
 
-export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
+export function CspJoinModal({ isOpen, onClose, onSubmitted }: CspJoinModalProps) {
   // Form states matching mockup
   const [brandName, setBrandName] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
@@ -294,6 +295,7 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
       });
       setExisting(data.data);
       setIsSubmitted(true);
+      onSubmitted?.(data.data);
     } catch (error) {
       const message =
         (error as {response?: {data?: {message?: string}}})?.response?.data

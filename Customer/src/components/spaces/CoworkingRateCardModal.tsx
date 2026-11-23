@@ -62,7 +62,7 @@ export const COWORKING_RATE_CARD_PLANS: RateCardPlan[] = [
       'High-Speed Wi-Fi & Dedicated Power',
       'Complimentary Beverages & Pantry Access',
       'Access to Networking & Creative Events',
-      'Flexible Hours (9:00 AM – 10:00 PM)',
+      'Flexible Hours (8:00 AM – 10:00 PM)',
     ],
   },
   {

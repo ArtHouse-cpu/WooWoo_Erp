@@ -299,7 +299,7 @@ export default function SpacesMarketplacePage() {
       (space.name || '').toLowerCase().includes('pass') ||
       (space.name || '').toLowerCase().includes('cowork');
     if (isCoworking) {
-      setCoworkingBookingSpace(space);
+      setSelected(space);
     } else {
       setBookingSpace(space);
     }
@@ -698,7 +698,8 @@ export default function SpacesMarketplacePage() {
                 p.name.toLowerCase().includes(passId.toLowerCase()),
             ) || coworkingList[0];
           if (matched) {
-            setCoworkingBookingSpace(matched);
+            setShowRateCardModal(false);
+            setSelected(matched);
           }
         }}
       />
