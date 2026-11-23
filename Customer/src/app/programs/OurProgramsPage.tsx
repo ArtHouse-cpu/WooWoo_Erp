@@ -18,11 +18,7 @@ export default function OurProgramsPage({defaultTab}: OurProgramsPageProps) {
     : 'all';
 
   const handleClose = () => {
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate('/home');
-    }
+    navigate('/home');
   };
 
   return (

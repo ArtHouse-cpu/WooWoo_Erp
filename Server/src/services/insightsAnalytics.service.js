@@ -3,6 +3,9 @@ import SpaceBooking from '../models/spaceBooking.model.js';
 import Food from '../models/food.model.js';
 import Product from '../models/product.model.js';
 import Space from '../models/space.model.js';
+import Subscription from '../models/subscription.model.js';
+import Customer from '../models/customer.model.js';
+import Membership from '../models/membership.model.js';
 import {
   isMembershipPurchaseLine,
   normalizeLineType,
@@ -281,6 +284,11 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
   const periods = {morning: {bills: 0, revenue: 0}, afternoon: {bills: 0, revenue: 0}, evening: {bills: 0, revenue: 0}, night: {bills: 0, revenue: 0}};
   const weekdays = Object.fromEntries(WEEKDAYS.map(day => [day, {bills: 0, revenue: 0}]));
   const customers = new Map();
+  const segmentCustomers = {
+    food: new Map(),
+    space: new Map(),
+    store: new Map(),
+  };
   let bills = 0;
   let revenue = 0;
 
@@ -304,6 +312,10 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
     }
 
     const seen = new Set();
+    const custKey = customerKeyOf(invoice);
+    const custName = String(invoice.customerName || 'Walk-in').trim() || 'Walk-in';
+    const custPhone = phoneKey(invoice.customerPhone);
+
     for (const line of lines) {
       if (!(line.revenue > 0) && !(line.qty > 0)) continue;
       const bucket = segments[line.segment];
@@ -314,6 +326,28 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
         seen.add(line.segment);
       }
       if (keepItems) addItem(bucket.items, line, invoice._id);
+
+      if (keepCustomers && segmentCustomers[line.segment]) {
+        const segMap = segmentCustomers[line.segment];
+        let custRow = segMap.get(custKey);
+        if (!custRow) {
+          custRow = {
+            name: custName,
+            phone: custPhone,
+            spend: 0,
+            billsSet: new Set(),
+            qty: 0,
+            itemsMap: new Map(),
+          };
+          segMap.set(custKey, custRow);
+        }
+        if (custName && custRow.name === 'Walk-in') custRow.name = custName;
+        if (custPhone && !custRow.phone) custRow.phone = custPhone;
+        custRow.spend = roundMoney(custRow.spend + line.revenue);
+        custRow.qty += line.qty;
+        custRow.billsSet.add(String(invoice._id || invoice.invoiceCode || Math.random()));
+        custRow.itemsMap.set(line.name, (custRow.itemsMap.get(line.name) || 0) + line.qty);
+      }
     }
 
     if (keepPeak) {
@@ -326,13 +360,12 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
     }
 
     if (keepCustomers) {
-      const key = customerKeyOf(invoice);
       const when = istParts(invoice.createdAt || invoice.invoiceDate);
-      const row = customers.get(key) || {
-        key,
+      const row = customers.get(custKey) || {
+        key: custKey,
         customerId: invoice.customerId ? String(invoice.customerId) : '',
-        name: String(invoice.customerName || 'Walk-in').trim() || 'Walk-in',
-        phone: phoneKey(invoice.customerPhone),
+        name: custName,
+        phone: custPhone,
         spend: 0,
         bills: 0,
         days: new Set(),
@@ -355,11 +388,11 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
       if (when.day > row.lastVisit) row.lastVisit = when.day;
       if (allocated.member) row.member = true;
       if (String(invoice.customerName || '').trim()) row.name = String(invoice.customerName).trim();
-      customers.set(key, row);
+      customers.set(custKey, row);
     }
   }
 
-  return {segments, membership, periods, weekdays, customers, bills, revenue};
+  return {segments, membership, periods, weekdays, customers, segmentCustomers, bills, revenue};
 };
 
 const topRows = (bucket, limit = 30) =>
@@ -527,13 +560,16 @@ const visitorSummary = (customers, prior) => {
 const readFilters = query => {
   const segment = String(query.segment || 'all').toLowerCase();
   const membership = String(query.membership || query.membershipType || 'all').toLowerCase();
+  const isMemberSegment = segment === 'membership';
   return {
     segment: ['food', 'space', 'store'].includes(segment) ? segment : 'all',
-    membership: membership === 'member' || membership === 'membership'
+    membership: isMemberSegment
       ? 'member'
-      : membership === 'nonmember' || membership === 'non-membership'
-        ? 'nonmember'
-        : 'all',
+      : membership === 'member' || membership === 'membership'
+        ? 'member'
+        : membership === 'nonmember' || membership === 'non-membership'
+          ? 'nonmember'
+          : 'all',
   };
 };
 
@@ -558,6 +594,135 @@ export const getInsights = async query => {
   } catch (error) {
     cache.delete(cacheKey);
     throw error;
+  }
+};
+
+const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 0) => {
+  try {
+    const [activeSubs, expiredSubs, custActive, currentSubs, prevSubs, allSubs, plans] = await Promise.all([
+      Subscription.countDocuments({ status: { $in: ['active', 'Active', 'completed'] } }).catch(() => 0),
+      Subscription.countDocuments({ status: { $in: ['expired', 'Expired'] } }).catch(() => 0),
+      Customer.countDocuments({
+        isDeleted: { $ne: true },
+        membershipType: { $nin: ['none', '', null, 'non-member', 'nonmember', 'regular'] },
+      }).catch(() => 0),
+      Subscription.find({
+        status: { $nin: ['cancelled', 'Cancelled', 'draft', 'Draft'] },
+        invoiceDate: { $gte: range.current.start, $lte: range.current.end },
+      }).select('grandTotal amount membershipType membershipPlanId customerName customerPhone customerId').lean().catch(() => []),
+      Subscription.find({
+        status: { $nin: ['cancelled', 'Cancelled', 'draft', 'Draft'] },
+        invoiceDate: { $gte: range.previous.start, $lte: range.previous.end },
+      }).select('grandTotal amount membershipType membershipPlanId customerName customerPhone customerId').lean().catch(() => []),
+      Subscription.find({
+        status: { $nin: ['cancelled', 'Cancelled', 'draft', 'Draft'] },
+      }).select('membershipType membershipPlanId customerName customerPhone customerId').lean().catch(() => []),
+      Membership.find().select('planId displayName').lean().catch(() => []),
+    ]);
+
+    const planDisplayMap = new Map();
+    for (const p of plans || []) {
+      if (p.planId) planDisplayMap.set(String(p.planId).toLowerCase(), p.displayName);
+      if (p._id) planDisplayMap.set(String(p._id), p.displayName);
+    }
+
+    const subCurrentRev = (currentSubs || []).reduce(
+      (sum, s) => sum + (Number(s.grandTotal ?? s.amount ?? 0) || 0),
+      0,
+    );
+    const subPrevRev = (prevSubs || []).reduce(
+      (sum, s) => sum + (Number(s.grandTotal ?? s.amount ?? 0) || 0),
+      0,
+    );
+
+    const revenue = roundMoney(subCurrentRev > 0 ? subCurrentRev : currentMemberRev);
+    const previousRevenue = roundMoney(subPrevRev > 0 ? subPrevRev : prevMemberRev);
+    const bills = (currentSubs && currentSubs.length > 0) ? currentSubs.length : (revenue > 0 ? 1 : 0);
+
+    const activeMembers = Math.max(Number(activeSubs) || 0, Number(custActive) || 0);
+    const expiredMembers = Number(expiredSubs) || 0;
+
+    const counts = new Map();
+    const targetSubs = (currentSubs && currentSubs.length > 0) ? currentSubs : allSubs;
+    for (const s of targetSubs || []) {
+      const raw = String(s.membershipType || s.membershipPlanId || '').trim();
+      if (!raw || ['none', 'regular'].includes(raw.toLowerCase())) continue;
+      counts.set(raw, (counts.get(raw) || 0) + 1);
+    }
+
+    let topPlanRaw = '';
+    let topPlanCount = 0;
+    for (const [key, cnt] of counts.entries()) {
+      if (cnt > topPlanCount) {
+        topPlanCount = cnt;
+        topPlanRaw = key;
+      }
+    }
+
+    const topSellingMembership = topPlanRaw
+      ? (planDisplayMap.get(topPlanRaw.toLowerCase()) || planDisplayMap.get(topPlanRaw) || topPlanRaw.charAt(0).toUpperCase() + topPlanRaw.slice(1))
+      : (plans?.[0]?.displayName || 'Standard');
+
+    const memCustMap = new Map();
+    for (const s of targetSubs || []) {
+      const custKey = s.customerId
+        ? `id:${String(s.customerId)}`
+        : (phoneKey(s.customerPhone)
+          ? `phone:${phoneKey(s.customerPhone)}`
+          : (String(s.customerName || '').trim().toLowerCase()
+            ? `name:${String(s.customerName).trim().toLowerCase()}`
+            : ''));
+      if (!custKey) continue;
+      const custName = String(s.customerName || 'Member').trim() || 'Member';
+      const custPhone = phoneKey(s.customerPhone);
+      const amount = Number(s.grandTotal ?? s.amount ?? 0) || 0;
+      let row = memCustMap.get(custKey);
+      if (!row) {
+        row = {
+          name: custName,
+          phone: custPhone,
+          spend: 0,
+          bills: 0,
+          qty: 0,
+          topItem: '',
+        };
+        memCustMap.set(custKey, row);
+      }
+      if (custName && row.name === 'Member') row.name = custName;
+      if (custPhone && !row.phone) row.phone = custPhone;
+      row.spend = roundMoney(row.spend + amount);
+      row.bills += 1;
+      row.qty += 1;
+      const planName = planDisplayMap.get(String(s.membershipPlanId || s.membershipType || '').toLowerCase()) || String(s.membershipType || 'Membership');
+      if (!row.topItem) row.topItem = planName;
+    }
+
+    const topCustomers = [...memCustMap.values()]
+      .sort((a, b) => b.spend - a.spend || b.bills - a.bills)
+      .slice(0, 20);
+
+    return {
+      revenue,
+      previousRevenue,
+      bills,
+      activeMembers,
+      expiredMembers,
+      topSellingMembership,
+      topSellingCount: topPlanCount,
+      topCustomers,
+    };
+  } catch (err) {
+    console.error('loadMembershipStats error:', err);
+    return {
+      revenue: currentMemberRev,
+      previousRevenue: prevMemberRev,
+      bills: currentMemberRev > 0 ? 1 : 0,
+      activeMembers: 0,
+      expiredMembers: 0,
+      topSellingMembership: 'Standard',
+      topSellingCount: 0,
+      topCustomers: [],
+    };
   }
 };
 
@@ -591,6 +756,26 @@ const buildInsights = async (range, filters) => {
     return row;
   });
 
+  const memStats = await loadMembershipStats(range, current.membership.member, previous.membership.member);
+  const memShare = total > 0 ? Math.round((memStats.revenue / total) * 1000) / 10 : 0;
+  segments.push({
+    key: 'membership',
+    label: 'Membership',
+    revenue: memStats.revenue,
+    share: memShare,
+    bills: memStats.bills,
+    qty: memStats.activeMembers,
+    bookings: 0,
+    hours: 0,
+    average: memStats.bills > 0 ? roundMoney(memStats.revenue / memStats.bills) : 0,
+    previousRevenue: memStats.previousRevenue,
+    changePct: changePct(memStats.revenue, memStats.previousRevenue),
+    top: [{ name: memStats.topSellingMembership, qty: memStats.topSellingCount, revenue: memStats.revenue, orders: memStats.bills }],
+    activeMembers: memStats.activeMembers,
+    expiredMembers: memStats.expiredMembers,
+    topSellingMembership: memStats.topSellingMembership,
+  });
+
   const periodRows = PERIODS.map(period => ({
     ...period,
     bills: current.periods[period.key].bills,
@@ -603,6 +788,36 @@ const buildInsights = async (range, filters) => {
   const richest = [...periodRows].sort((a, b) => b.revenue - a.revenue || b.bills - a.bills)[0];
   const weekdayRows = WEEKDAYS.map(day => ({day, ...current.weekdays[day]}));
   const busiestDay = [...weekdayRows].sort((a, b) => b.bills - a.bills || b.revenue - a.revenue)[0];
+
+  const topCustBySegment = map =>
+    [...(map?.values() || [])]
+      .map(row => {
+        let topItem = '';
+        let topItemQty = 0;
+        for (const [item, q] of row.itemsMap.entries()) {
+          if (q > topItemQty) {
+            topItemQty = q;
+            topItem = item;
+          }
+        }
+        return {
+          name: row.name,
+          phone: row.phone,
+          spend: roundMoney(row.spend),
+          bills: row.billsSet.size,
+          qty: row.qty,
+          topItem,
+        };
+      })
+      .sort((a, b) => b.spend - a.spend || b.bills - a.bills)
+      .slice(0, 20);
+
+  const topCustomers = {
+    food: topCustBySegment(current.segmentCustomers?.food),
+    space: topCustBySegment(current.segmentCustomers?.space),
+    store: topCustBySegment(current.segmentCustomers?.store),
+    membership: memStats.topCustomers || [],
+  };
 
   return {
     success: true,
@@ -626,8 +841,12 @@ const buildInsights = async (range, filters) => {
       otherBills: current.membership.otherBills,
       memberShare: total > 0 ? Math.round((current.membership.member / total) * 1000) / 10 : 0,
       otherShare: total > 0 ? Math.round((current.membership.other / total) * 1000) / 10 : 0,
+      activeMembers: memStats.activeMembers,
+      expiredMembers: memStats.expiredMembers,
+      topSellingMembership: memStats.topSellingMembership,
     },
     top: pictured,
+    topCustomers,
     visitors: visitorSummary(current.customers, prior),
     peak: {
       periods: periodRows,
