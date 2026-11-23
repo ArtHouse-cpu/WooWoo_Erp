@@ -20,6 +20,7 @@ import {
   Ticket,
   Gift,
   LayoutDashboard,
+  Calendar,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CspJoinModal } from "./CspJoinModal";
@@ -30,6 +31,8 @@ import { useHapApplication } from "../../hooks/useHapApplication";
 import { useMembership } from "../../context/MembershipContext";
 import { useAuthStore } from "../../store/authStore";
 import { cspProductApi, type CspProgramProduct } from "../../services/csp.service";
+import { authApi } from "../../services/auth.service";
+import type { WalletDashboard } from "../../types/auth";
 import Swal from "sweetalert2";
 
 type ProgramsBottomSheetProps = {
@@ -303,6 +306,143 @@ function HapMemberDashboard({
   );
 }
 
+function CvpMemberDashboard({
+  application,
+}: {
+  application: CvpApplication;
+}) {
+  const [walletData, setWalletData] = useState<WalletDashboard | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    authApi
+      .getWalletDashboard()
+      .then((res) => {
+        if (!cancelled && res.data?.success && res.data?.data) {
+          setWalletData(res.data.data);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const eventsCount = application.eventCount
+    ? application.eventCount.replace(/\s*events?/i, "").trim()
+    : "0";
+
+  const totalEarnings = walletData?.affiliateThisMonth?.earnings
+    ? `₹${walletData.affiliateThisMonth.earnings.toLocaleString("en-IN")}`
+    : "₹0";
+
+  const totalPayout = walletData?.balances?.withdrawable
+    ? `₹${walletData.balances.withdrawable.toLocaleString("en-IN")}`
+    : "₹0";
+
+  const kpis = [
+    { label: "Events", value: eventsCount, icon: Calendar, tone: "bg-[#F0FDFA] text-[#0D9488]" },
+    { label: "Hours", value: "0h", icon: Clock, tone: "bg-[#ECFDF5] text-[#059669]" },
+    { label: "Earnings", value: totalEarnings, icon: IndianRupee, tone: "bg-[#FFF8F2] text-[#EA580C]" },
+    { label: "Payout", value: totalPayout, icon: Wallet, tone: "bg-[#EFF6FF] text-[#2563EB]" },
+  ];
+
+  const availability =
+    Array.isArray(application.availability) && application.availability.length > 0
+      ? application.availability.join(", ")
+      : "Flexible";
+
+  return (
+    <div className="space-y-4 px-5 pb-2 text-left">
+      <div className="grid grid-cols-2 gap-2">
+        {kpis.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.label}
+              className="rounded-2xl border border-slate-100 bg-white p-3 shadow-xs"
+            >
+              <div className={`mb-2 flex h-7 w-7 items-center justify-center rounded-full ${item.tone}`}>
+                <Icon className="h-3.5 w-3.5" strokeWidth={2.25} />
+              </div>
+              <p className="text-[15px] font-black leading-none text-slate-900">{item.value}</p>
+              <p className="mt-1 text-[10px] font-bold text-slate-500">{item.label}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <section className="rounded-2xl border border-slate-100 bg-[#FAFBFD] p-3.5">
+        <h4 className="text-[13px] font-black text-slate-900">Volunteer Profile</h4>
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold text-slate-500">Profession</p>
+            <p className="truncate text-[12px] font-black text-slate-900">
+              {application.profession || "Volunteer"}
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold text-slate-500">Availability</p>
+            <p className="max-w-[60%] truncate text-right text-[12px] font-black text-slate-900">
+              {availability}
+            </p>
+          </div>
+          {application.eventType && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold text-slate-500">Event Preference</p>
+              <p className="max-w-[60%] truncate text-right text-[12px] font-black text-slate-900">
+                {application.eventType === "Both"
+                  ? "Paid & Unpaid"
+                  : `${application.eventType} Events`}
+              </p>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold text-slate-500">Status</p>
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
+                application.status === "approved"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {application.status === "approved" ? "Active Volunteer" : "Under Review"}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-100 bg-white p-3.5">
+        <h4 className="text-[13px] font-black text-slate-900">Payout Summary</h4>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-[#EFF6FF] px-3 py-2">
+            <p className="text-[10px] font-bold text-slate-500">Pending</p>
+            <p className="mt-1 text-[14px] font-black text-slate-900">
+              ₹{walletData?.balances?.affiliateReserved?.toLocaleString("en-IN") || "0"}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[#F0FDF4] px-3 py-2">
+            <p className="text-[10px] font-bold text-slate-500">Completed</p>
+            <p className="mt-1 text-[14px] font-black text-slate-900">
+              ₹{walletData?.summary?.totalAffiliateEarned?.toLocaleString("en-IN") || "0"}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-100 bg-white p-3.5">
+        <div className="flex items-center gap-2">
+          <Clock className="h-3.5 w-3.5 text-slate-400" />
+          <h4 className="text-[13px] font-black text-slate-900">Recent Activity</h4>
+        </div>
+        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-slate-500">
+          No volunteer shifts or payouts yet.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 function CspMemberDashboard({
   products,
   loading,
@@ -409,7 +549,6 @@ export function ProgramsBottomSheet({
 }: ProgramsBottomSheetProps) {
   const navigate = useNavigate();
   const customer = useAuthStore((state) => state.customer);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { isPremium } = useMembership();
   const { application, loaded: cspLoaded, refresh: refreshCsp } = useCspApplication();
   const { application: hapApplication, loaded: hapLoaded, refresh: refreshHap } = useHapApplication();
@@ -499,25 +638,19 @@ export function ProgramsBottomSheet({
 
   // Independent enrollment checks for CSP, HAP, and CVP
   const isCspJoined = Boolean(
-    isAuthenticated &&
-      customer?._id &&
-      cspLoaded &&
+    cspLoaded &&
       application &&
       (application.status === "approved" || application.status === "under_review")
   );
 
   const isHapJoined = Boolean(
-    isAuthenticated &&
-      customer?._id &&
-      hapLoaded &&
+    hapLoaded &&
       hapApplication &&
       (hapApplication.status === "approved" || hapApplication.status === "under_review")
   );
 
   const isCvpJoined = Boolean(
-    isAuthenticated &&
-      customer?._id &&
-      cvpLoaded &&
+    cvpLoaded &&
       cvpApplication &&
       (cvpApplication.status === "approved" || cvpApplication.status === "under_review")
   );
@@ -532,22 +665,11 @@ export function ProgramsBottomSheet({
       : false;
 
   const handleOpenDashboard = (tab: "csp" | "hap" | "cvp") => {
-    if (tab === "csp") {
-      if (!asPage) {
-        onClose();
-      }
-      navigate("/program");
-    } else if (tab === "hap") {
-      if (!asPage) {
-        onClose();
-      }
-      navigate("/program/hap");
-    } else if (tab === "cvp") {
-      if (!asPage) {
-        onClose();
-      }
-      navigate("/program/cvp");
+    if (!asPage) {
+      onClose();
     }
+    const path = tab === "csp" ? "/program" : tab === "hap" ? "/program/hap" : "/program/cvp";
+    navigate(path, { replace: asPage });
   };
 
   // Sync active tab with initialTab prop when modal opens
@@ -1026,14 +1148,16 @@ export function ProgramsBottomSheet({
                       </div>
                     </div>
                   </div>
-                ) : activeTab === "csp" && enrolled ? (
+                ) : activeTab === "csp" && (enrolled || isCspJoined) ? (
                   <CspMemberDashboard products={cspProducts} loading={cspProductsLoading} />
-                ) : activeTab === "hap" && hapApproved && hapApplication ? (
+                ) : activeTab === "hap" && (hapApproved || isHapJoined) && hapApplication ? (
                   <HapMemberDashboard
                     networkSize={hapApplication.networkSize}
                     profession={hapApplication.profession}
                     presence={hapApplication.presence}
                   />
+                ) : activeTab === "cvp" && isCvpJoined && cvpApplication ? (
+                  <CvpMemberDashboard application={cvpApplication} />
                 ) : (
                   <>
                     {/* Status Notice for CSP */}
@@ -1069,23 +1193,14 @@ export function ProgramsBottomSheet({
                       </div>
                     ) : null}
 
-                    {/* Status Notice for CVP */}
-                    {activeTab === "cvp" && cvpApplication ? (
-                      <div className="mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left border-emerald-200 bg-emerald-50">
-                        <div className="flex items-center justify-between">
-                          <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-800">
-                            Application Submitted
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setIsCvpJoinOpen(true)}
-                            className="text-[11px] font-extrabold text-emerald-700 underline hover:text-emerald-800 cursor-pointer"
-                          >
-                            View / Edit Form
-                          </button>
-                        </div>
-                        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-emerald-900">
-                          Thank you {cvpApplication.name}! Your volunteering application as <strong>{cvpApplication.profession || "Volunteer"}</strong> has been submitted. Check WhatsApp for confirmation.
+                    {/* Status Notice for CVP (if rejected) */}
+                    {activeTab === "cvp" && cvpApplication?.status === "rejected" ? (
+                      <div className="mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left border-rose-200 bg-rose-50">
+                        <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-rose-700">
+                          Application Not Approved
+                        </span>
+                        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-rose-700">
+                          We could not approve your volunteer application at this time. Please contact our community coordinator on WhatsApp.
                         </p>
                       </div>
                     ) : null}
@@ -1514,6 +1629,11 @@ export function ProgramsBottomSheet({
                             ? "Hi! I would like to know more about the House Affiliate Program (HAP) at Woo Woo Art House."
                             : "Hi! I would like to know more about the Community Volunteering Program (CVP) at Woo Woo Art House.";
                         window.open(`https://wa.me/918073988123?text=${encodeURIComponent(text)}`, "_blank");
+                        if (asPage) {
+                          navigate("/home");
+                        } else {
+                          onClose();
+                        }
                       }}
                       className={`flex-1 py-3 px-3 rounded-[16px] border text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                         activeTab === "all"
@@ -1586,12 +1706,25 @@ export function ProgramsBottomSheet({
           setIsJoinModalOpen(false);
           void refreshCsp();
         }}
+        onSubmitted={() => {
+          void refreshCsp();
+          if (asPage) {
+            navigate("/home");
+          } else {
+            onClose();
+          }
+        }}
       />
       <HapJoinModal
         isOpen={isHapJoinOpen}
         onClose={() => setIsHapJoinOpen(false)}
         onSubmitted={() => {
           void refreshHap();
+          if (asPage) {
+            navigate("/home");
+          } else {
+            onClose();
+          }
         }}
       />
       <CvpJoinModal
@@ -1600,6 +1733,11 @@ export function ProgramsBottomSheet({
         onSubmitted={(app) => {
           setCvpApplication(app);
           setCvpLoaded(true);
+          if (asPage) {
+            navigate("/home");
+          } else {
+            onClose();
+          }
         }}
       />
     </>

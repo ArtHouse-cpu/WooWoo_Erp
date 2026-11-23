@@ -5,7 +5,11 @@ import {
   Calendar,
   ChevronDown,
   Clock3,
+  Crown,
+  FileText,
   Layers,
+  LayoutGrid,
+  List,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -13,6 +17,7 @@ import {
   ShoppingBag,
   Store,
   TrendingUp,
+  User,
   Users,
   Utensils,
   X,
@@ -40,6 +45,7 @@ import {
   type InsightQuery,
   type InsightSegment,
   type InsightsPayload,
+  type RankedCustomer,
   type RankedItem,
   type VisitHistory,
   type VisitorRow,
@@ -56,7 +62,20 @@ const PRESETS: { id: InsightPreset; label: string }[] = [
   { id: "custom", label: "Custom" },
 ];
 
-const SEGMENT_COLOR = { food: "#f59e0b", space: "#6366f1", store: "#0d9488" };
+const PRIMARY_TABS: { id: InsightSegment; label: string }[] = [
+  { id: "all", label: "Overall" },
+  { id: "food", label: "Food" },
+  { id: "store", label: "Store" },
+  { id: "space", label: "Space" },
+  { id: "membership", label: "Membership" },
+];
+
+const SEGMENT_COLOR: Record<string, string> = {
+  food: "#f59e0b",
+  space: "#6366f1",
+  store: "#0d9488",
+  membership: "#7c3aed",
+};
 const inr = (value: number) => `₹${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
 const pretty = (ymd?: string) => {
   if (!ymd) return "—";
@@ -114,6 +133,10 @@ const InsightsAnalyticsScreen = () => {
 
   useEffect(() => {
     if (!data?.range?.from || !data.range.to) return;
+    if (segment !== "all" && segment !== "space") {
+      setSpaceUse(null);
+      return;
+    }
     const controller = new AbortController();
     handleGetBookingOverview({ from: data.range.from, to: data.range.to, limit: 1 })
       .then(payload => {
@@ -123,7 +146,7 @@ const InsightsAnalyticsScreen = () => {
         if (!controller.signal.aborted) setSpaceUse(null);
       });
     return () => controller.abort();
-  }, [data?.range?.from, data?.range?.to]);
+  }, [data?.range?.from, data?.range?.to, segment]);
 
   const reset = () => {
     setPreset("last30");
@@ -140,7 +163,9 @@ const InsightsAnalyticsScreen = () => {
       ? "Food"
       : segment === "space"
       ? "Space"
-      : "Store";
+      : segment === "store"
+      ? "Store"
+      : "Membership";
 
   const membershipLabel =
     membership === "all"
@@ -158,28 +183,60 @@ const InsightsAnalyticsScreen = () => {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-slate-100/90 transition hover:scale-95 active:scale-90 cursor-pointer"
+              className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-slate-100/90 transition hover:scale-95 active:scale-90 cursor-pointer"
               aria-label="Go back"
             >
               <ArrowLeft size={18} strokeWidth={2.5} />
             </button>
             <h1 className="truncate text-lg sm:text-xl font-black tracking-tight text-slate-900">
-              Insights & Analytics
+              Insights
             </h1>
           </div>
 
-          {/* Right: Refresh icon button on left side of Date filter */}
+          {/* Right: Refresh icon button on desktop / All Customers filter icon button on mobile, Date filter */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Refresh icon button on left side of date filter */}
+            {/* Desktop Refresh icon button */}
             <button
               type="button"
               onClick={() => setReloadKey(k => k + 1)}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#673DE6] shadow-[0_2px_10px_rgba(103,61,230,0.08)] border border-purple-100/90 transition hover:bg-purple-50 hover:scale-95 active:scale-90 cursor-pointer"
+              className="hidden sm:flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#673DE6] shadow-[0_2px_10px_rgba(103,61,230,0.08)] border border-purple-100/90 transition hover:bg-purple-50 hover:scale-95 active:scale-90 cursor-pointer"
               aria-label="Refresh data"
               title="Refresh"
             >
               <RefreshCw size={16} strokeWidth={2.3} className={loading ? "animate-spin" : ""} />
             </button>
+
+            {/* Mobile Only: All Customers filter icon button (replaces refresh icon on mobile) */}
+            <div className="relative sm:hidden">
+              <button
+                type="button"
+                className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-[0_2px_10px_rgba(103,61,230,0.08)] border transition active:scale-95 cursor-pointer ${
+                  membership !== "all"
+                    ? "border-[#673DE6] bg-purple-50 text-[#673DE6]"
+                    : "border-purple-100/90 text-slate-700 hover:bg-purple-50/50"
+                }`}
+                aria-label="Customer filter"
+                title={`Customer: ${membershipLabel}`}
+              >
+                <Users size={16} strokeWidth={2.2} className="text-[#673DE6]" />
+                {membership !== "all" && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#673DE6] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#673DE6]" />
+                  </span>
+                )}
+              </button>
+              <select
+                value={membership}
+                onChange={e => setMembership(e.target.value as InsightMembership)}
+                aria-label="Customer filter"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+              >
+                <option value="all">All Customers</option>
+                <option value="member">Membership</option>
+                <option value="nonmember">Non-membership</option>
+              </select>
+            </div>
 
             {/* Date filter pill with pink sparkle burst accent */}
             <div className="relative shrink-0">
@@ -213,8 +270,31 @@ const InsightsAnalyticsScreen = () => {
           </div>
         </div>
 
-        {/* ================= ROW 2: FILTERS (SEGMENT & MEMBERSHIP) ================= */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* ================= MOBILE PRIMARY TABS (Overall | Food | Store | Space | Membership) ================= */}
+        <div className="sm:hidden">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none p-1 bg-white/90 backdrop-blur-xs rounded-2xl border border-purple-100/90 shadow-[0_2px_8px_rgba(103,61,230,0.04)]">
+            {PRIMARY_TABS.map(tab => {
+              const active = segment === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSegment(tab.id)}
+                  className={`flex-1 min-w-[68px] py-2 px-2.5 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                    active
+                      ? "bg-[#673DE6] text-white shadow-[0_2px_8px_rgba(103,61,230,0.28)]"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-purple-50/60"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ================= ROW 2: FILTERS (SEGMENT & MEMBERSHIP) - DESKTOP ONLY ================= */}
+        <div className="hidden sm:grid grid-cols-2 gap-3">
           {/* Segment filter pill */}
           <div className="relative">
             <div className="flex items-center justify-between rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-100/90 text-slate-800 font-bold text-xs pointer-events-none">
@@ -234,6 +314,7 @@ const InsightsAnalyticsScreen = () => {
               <option value="food">Food</option>
               <option value="space">Space</option>
               <option value="store">Store</option>
+              <option value="membership">Membership</option>
             </select>
           </div>
 
@@ -293,14 +374,38 @@ const InsightsAnalyticsScreen = () => {
           </div>
         )}
 
-        {/* ================= 1. SEGMENT REVENUE CARDS (SIDE SCROLLABLE JUST BELOW FILTERS) ================= */}
-        {data ? <SegmentCards segments={data.segments} /> : null}
+        {/* ================= DESKTOP: SEGMENT CARDS THEN PERIOD KPIS ================= */}
+        <div className="hidden sm:block space-y-3">
+          {data ? (
+            <SegmentCards
+              segments={
+                segment === "all"
+                  ? data.segments
+                  : data.segments.filter(s => s.key === segment)
+              }
+            />
+          ) : null}
+          {data ? <PeriodKpis periods={data.peak.periods} /> : null}
+        </div>
 
-        {/* ================= 2. TIME-OF-DAY PERIOD KPIS ================= */}
-        {data ? <PeriodKpis periods={data.peak.periods} /> : null}
+        {/* ================= MOBILE: TIME-BASED KPIS IN ALL 5 TABS ================= */}
+        <div className="sm:hidden space-y-3">
+          {data ? <PeriodKpis periods={data.peak.periods} /> : null}
+          {data ? (
+            <SegmentCards
+              segments={
+                segment === "all"
+                  ? data.segments
+                  : data.segments.filter(s => s.key === segment)
+              }
+            />
+          ) : null}
+        </div>
 
         {/* ================= SPACE BOOKING UTILIZATION & DAY-WISE CHART ================= */}
-        <SpaceUtilizationPanel data={spaceUse} />
+        {segment !== "food" && (segment === "all" || segment === "space") && (
+          <SpaceUtilizationPanel data={spaceUse} />
+        )}
 
         {/* ================= ERROR & SKELETON ================= */}
         {error ? (
@@ -319,8 +424,8 @@ const InsightsAnalyticsScreen = () => {
         {/* ================= REVENUE, TOP ITEMS, VISITORS, PEAK ================= */}
         {data ? (
           <>
-            <RevenueSection data={data} loading={loading} />
-            <TopSection data={data} />
+            <RevenueSection data={data} loading={loading} segment={segment} />
+            <TopSection data={data} segment={segment} />
             <VisitorSection query={query} summary={data.visitors} />
             <PeakSection data={data} />
           </>
@@ -334,19 +439,29 @@ function ChipGroup<T extends string>({
   value,
   onChange,
   options,
+  fullWidth = false,
+  className = "",
 }: {
   value: T;
   onChange: (value: T) => void;
   options: [T, string][];
+  fullWidth?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="flex rounded-xl bg-purple-50/80 p-0.5 border border-purple-100/80">
+    <div
+      className={`flex items-center rounded-xl bg-purple-50/80 p-0.5 border border-purple-100/80 ${
+        fullWidth ? "w-full" : ""
+      } ${className}`}
+    >
       {options.map(([id, label]) => (
         <button
           key={id}
           type="button"
           onClick={() => onChange(id)}
-          className={`rounded-lg px-2.5 py-1 text-[10px] sm:text-[11px] font-bold transition cursor-pointer ${
+          className={`rounded-lg px-2.5 py-1.5 text-[10px] sm:text-[11px] font-bold transition cursor-pointer text-center justify-center whitespace-nowrap ${
+            fullWidth ? "flex-1" : ""
+          } ${
             value === id
               ? "bg-[#673DE6] text-white shadow-xs"
               : "text-slate-600 hover:text-slate-900"
@@ -385,60 +500,131 @@ function PeriodKpis({ periods }: { periods: InsightsPayload["peak"]["periods"] }
 }
 
 function SegmentCards({ segments }: { segments: InsightsPayload["segments"] }) {
+  const isSingle = segments.length === 1;
+
   return (
-    <div className="flex overflow-x-auto gap-3 pb-2 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 scrollbar-none snap-x snap-mandatory overscroll-x-contain">
+    <div
+      className={
+        isSingle
+          ? "w-full"
+          : "flex overflow-x-auto gap-3 pb-2 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-none snap-x snap-mandatory overscroll-x-contain"
+      }
+    >
       {segments.map((row) => {
-        const cardTheme = row.key === "food"
+        const isFood = row.key === "food";
+        const isSpace = row.key === "space";
+        const isStore = row.key === "store";
+        const isMembership = row.key === "membership";
+
+        const cardTheme = isFood
           ? "border-amber-200/90 bg-gradient-to-br from-amber-50/80 via-orange-50/30 to-white shadow-xs"
-          : row.key === "space"
+          : isSpace
           ? "border-indigo-200/90 bg-gradient-to-br from-indigo-50/80 via-purple-50/30 to-white shadow-xs"
-          : "border-teal-200/90 bg-gradient-to-br from-teal-50/80 via-emerald-50/30 to-white shadow-xs";
+          : isStore
+          ? "border-teal-200/90 bg-gradient-to-br from-teal-50/80 via-emerald-50/30 to-white shadow-xs"
+          : "border-purple-200/90 bg-gradient-to-br from-purple-50/80 via-fuchsia-50/30 to-white shadow-xs";
 
-        const iconTheme = row.key === "food"
+        const iconTheme = isFood
           ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/25"
-          : row.key === "space"
+          : isSpace
           ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-sm shadow-indigo-500/25"
-          : "bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-sm shadow-teal-500/25";
+          : isStore
+          ? "bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-sm shadow-teal-500/25"
+          : "bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-sm shadow-purple-500/25";
 
-        const textTheme = row.key === "food"
+        const textTheme = isFood
           ? "text-amber-950"
-          : row.key === "space"
+          : isSpace
           ? "text-indigo-950"
-          : "text-teal-950";
+          : isStore
+          ? "text-teal-950"
+          : "text-purple-950";
 
-        const dlTheme = row.key === "food"
+        const dlTheme = isFood
           ? "bg-amber-50/70 border-amber-100/90"
-          : row.key === "space"
+          : isSpace
           ? "bg-indigo-50/70 border-indigo-100/90"
-          : "bg-teal-50/70 border-teal-100/90";
+          : isStore
+          ? "bg-teal-50/70 border-teal-100/90"
+          : "bg-purple-50/70 border-purple-100/90";
 
         return (
           <article
             key={row.key}
-            className={`w-[85vw] max-w-[340px] sm:w-[340px] lg:w-auto shrink-0 snap-start flex flex-col justify-between rounded-2xl border ${cardTheme} p-3.5 sm:p-4`}
+            className={`${
+              isSingle
+                ? "w-full sm:max-w-xl"
+                : "w-[85vw] max-w-[340px] sm:w-[320px] shrink-0 snap-start"
+            } flex flex-col justify-between rounded-2xl border ${cardTheme} p-3.5 sm:p-4`}
           >
             <div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${iconTheme}`}>
-                    {row.key === "food" ? <Utensils size={15} /> : row.key === "space" ? <Store size={15} /> : <ShoppingBag size={15} />}
+                    {isFood ? (
+                      <Utensils size={15} />
+                    ) : isSpace ? (
+                      <Store size={15} />
+                    ) : isStore ? (
+                      <ShoppingBag size={15} />
+                    ) : (
+                      <Crown size={15} />
+                    )}
                   </span>
                   <div>
                     <p className="text-xs sm:text-sm font-bold text-slate-900">{row.label}</p>
-                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">{row.share}% of net sales</p>
+                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">
+                      {isMembership
+                        ? `${row.activeMembers ?? 0} active members`
+                        : `${row.share}% of net sales`}
+                    </p>
                   </div>
                 </div>
                 <Trend value={row.changePct} />
               </div>
               <p className={`mt-2.5 sm:mt-3 text-xl sm:text-2xl font-black ${textTheme}`}>{inr(row.revenue)}</p>
-              <dl className={`mt-2.5 sm:mt-3 grid grid-cols-2 gap-2 text-[10px] sm:text-[11px] rounded-xl p-2.5 border ${dlTheme}`}>
-                <div><dt className="text-slate-500 font-medium">Bills</dt><dd className="font-bold text-slate-800">{row.bills}</dd></div>
-                <div><dt className="text-slate-500 font-medium">Average bill</dt><dd className="font-bold text-slate-800">{inr(row.average)}</dd></div>
-                <div><dt className="text-slate-500 font-medium">{row.key === "space" ? "Booked hours" : "Quantity sold"}</dt><dd className="font-bold text-slate-800">{row.key === "space" ? row.hours : row.qty}</dd></div>
-                <div><dt className="text-slate-500 font-medium">{row.key === "space" ? "Bookings" : "Previous period"}</dt><dd className="font-bold text-slate-800">{row.key === "space" ? row.bookings : inr(row.previousRevenue)}</dd></div>
-              </dl>
+
+              {isMembership ? (
+                <dl className={`mt-2.5 sm:mt-3 grid grid-cols-2 gap-2 text-[10px] sm:text-[11px] rounded-xl p-2.5 border ${dlTheme}`}>
+                  <div>
+                    <dt className="text-slate-500 font-medium">Revenue</dt>
+                    <dd className="font-bold text-slate-800">{inr(row.revenue)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500 font-medium">Total active members</dt>
+                    <dd className="font-bold text-slate-800">{row.activeMembers ?? 0}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500 font-medium">Expired</dt>
+                    <dd className="font-bold text-slate-800">{row.expiredMembers ?? 0}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500 font-medium truncate">Top selling</dt>
+                    <dd
+                      className="font-bold text-slate-800 truncate"
+                      title={row.topSellingMembership || row.top[0]?.name || "—"}
+                    >
+                      {row.topSellingMembership || row.top[0]?.name || "—"}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <dl className={`mt-2.5 sm:mt-3 grid grid-cols-2 gap-2 text-[10px] sm:text-[11px] rounded-xl p-2.5 border ${dlTheme}`}>
+                  <div><dt className="text-slate-500 font-medium">Bills</dt><dd className="font-bold text-slate-800">{row.bills}</dd></div>
+                  <div><dt className="text-slate-500 font-medium">Average bill</dt><dd className="font-bold text-slate-800">{inr(row.average)}</dd></div>
+                  <div><dt className="text-slate-500 font-medium">{isSpace ? "Booked hours" : "Quantity sold"}</dt><dd className="font-bold text-slate-800">{isSpace ? row.hours : row.qty}</dd></div>
+                  <div><dt className="text-slate-500 font-medium">{isSpace ? "Bookings" : "Previous period"}</dt><dd className="font-bold text-slate-800">{isSpace ? row.bookings : inr(row.previousRevenue)}</dd></div>
+                </dl>
+              )}
             </div>
-            {row.top[0] ? <p className="mt-2.5 truncate text-[10px] sm:text-[11px] text-slate-500">Top: <span className="font-bold text-slate-800">{row.top[0].name}</span></p> : null}
+
+            {isMembership ? (
+              <p className="mt-2.5 truncate text-[10px] sm:text-[11px] text-slate-500">
+                Top selling membership: <span className="font-bold text-slate-800">{row.topSellingMembership || row.top[0]?.name || "—"}</span>
+              </p>
+            ) : row.top[0] ? (
+              <p className="mt-2.5 truncate text-[10px] sm:text-[11px] text-slate-500">Top: <span className="font-bold text-slate-800">{row.top[0].name}</span></p>
+            ) : null}
           </article>
         );
       })}
@@ -446,7 +632,15 @@ function SegmentCards({ segments }: { segments: InsightsPayload["segments"] }) {
   );
 }
 
-function RevenueSection({ data, loading }: { data: InsightsPayload; loading: boolean }) {
+function RevenueSection({
+  data,
+  loading,
+  segment = "all",
+}: {
+  data: InsightsPayload;
+  loading: boolean;
+  segment?: InsightSegment;
+}) {
   const [mobileSlide, setMobileSlide] = useState(0);
   const mobileScrollRef = useRef<HTMLDivElement>(null);
 
@@ -469,12 +663,39 @@ function RevenueSection({ data, loading }: { data: InsightsPayload; loading: boo
     setMobileSlide(idx);
   };
 
-  const donut = data.segments.filter(row => row.revenue > 0).map(row => ({
-    name: row.label,
-    value: row.revenue,
-    share: row.share,
-    color: SEGMENT_COLOR[row.key],
-  }));
+  const currentSegment = segment === "all" ? null : data.segments.find(s => s.key === segment);
+
+  const totalRevenue = currentSegment ? currentSegment.revenue : data.totals.revenue;
+  const growth = currentSegment ? currentSegment.changePct : data.totals.changePct;
+  const previousRevenue = currentSegment ? currentSegment.previousRevenue : data.totals.previousRevenue;
+  const share = currentSegment ? currentSegment.share : 100;
+
+  const totalBills = currentSegment ? currentSegment.bills : data.totals.bills;
+  const avgBill = currentSegment
+    ? currentSegment.average || (currentSegment.bills > 0 ? Math.round(currentSegment.revenue / currentSegment.bills) : 0)
+    : (data.totals.bills > 0 ? Math.round(data.totals.revenue / data.totals.bills) : 0);
+
+  const itemsSold = currentSegment
+    ? (segment === "space"
+        ? (currentSegment.hours ? `${currentSegment.hours} hrs` : `${currentSegment.bookings} bookings`)
+        : segment === "membership"
+        ? `${currentSegment.activeMembers ?? currentSegment.qty} members`
+        : `${currentSegment.qty} sold`)
+    : `${data.segments.reduce((sum, s) => sum + (s.qty || 0), 0)} sold`;
+
+  const filteredSegments =
+    segment === "all"
+      ? data.segments
+      : data.segments.filter(row => row.key === segment);
+
+  const donut = filteredSegments
+    .filter(row => row.revenue > 0)
+    .map(row => ({
+      name: row.label,
+      value: row.revenue,
+      share: row.share,
+      color: SEGMENT_COLOR[row.key],
+    }));
   const memberDonut = [
     { name: "Membership", value: data.membership.memberRevenue, share: data.membership.memberShare, color: "#7c3aed" },
     { name: "Non-membership", value: data.membership.otherRevenue, share: data.membership.otherShare, color: "#94a3b8" },
@@ -483,6 +704,93 @@ function RevenueSection({ data, loading }: { data: InsightsPayload; loading: boo
   return (
     <section className="space-y-3">
       <SectionTitle title="Revenue Overview" note={loading ? "Updating…" : "Compared with previous period"} />
+
+      {/* ================= REVENUE & BILLS KPI CARDS ================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+        {/* Card 1: Revenue Overview Card */}
+        <article className="flex flex-col justify-between rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/30 p-3.5 sm:p-4 shadow-xs">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#673DE6] text-white shadow-sm shadow-purple-500/25">
+                  <TrendingUp size={16} strokeWidth={2.3} />
+                </span>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                    {segment === "all" ? "Total Revenue" : `${currentSegment?.label || "Segment"} Revenue`}
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-purple-700">
+                    {share}% of sales
+                  </p>
+                </div>
+              </div>
+              <Trend value={growth} />
+            </div>
+
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              {inr(totalRevenue)}
+            </p>
+          </div>
+
+          <div className="mt-3 pt-2.5 border-t border-purple-100/80 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Growth vs previous</span>
+            <span className="font-bold text-slate-800">
+              {growth != null ? `${growth >= 0 ? "+" : ""}${growth}%` : "New"}
+              {previousRevenue > 0 ? ` (Prev: ${inr(previousRevenue)})` : ""}
+            </span>
+          </div>
+        </article>
+
+        {/* Card 2: New Card for Bills */}
+        <article className="flex flex-col justify-between rounded-2xl border border-indigo-200/90 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 p-3.5 sm:p-4 shadow-xs">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-sm shadow-indigo-500/25">
+                  <FileText size={16} strokeWidth={2.3} />
+                </span>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900">Bills & Items</h3>
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-indigo-700">
+                    Average: {inr(avgBill)}
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-extrabold text-indigo-700 border border-indigo-200/80">
+                {totalBills} {totalBills === 1 ? "bill" : "bills"}
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-indigo-50/60 border border-indigo-100/80 p-2.5 text-center">
+              <div>
+                <dt className="text-[10px] font-medium text-slate-500 truncate">Avg. Bill</dt>
+                <dd className="mt-0.5 text-xs sm:text-sm font-black text-slate-900 truncate">
+                  {inr(avgBill)}
+                </dd>
+              </div>
+              <div className="border-x border-indigo-100/90 px-1">
+                <dt className="text-[10px] font-medium text-slate-500 truncate">Total Bills</dt>
+                <dd className="mt-0.5 text-xs sm:text-sm font-black text-indigo-700 truncate">
+                  {totalBills}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-medium text-slate-500 truncate">Items Sold</dt>
+                <dd className="mt-0.5 text-xs sm:text-sm font-black text-emerald-700 truncate">
+                  {itemsSold}
+                </dd>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 pt-2.5 border-t border-indigo-100/80 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Volume summary</span>
+            <span className="font-bold text-slate-800">
+              {totalBills} bills · {itemsSold}
+            </span>
+          </div>
+        </article>
+      </div>
 
       {/* MOBILE VIEW ONLY: Both donuts unified inside ONE box, horizontally scrollable */}
       <div className="block sm:hidden">
@@ -667,49 +975,207 @@ function Trend({ value }: { value: number | null }) {
   );
 }
 
-function TopSection({ data }: { data: InsightsPayload }) {
+function TopSection({
+  data,
+  segment = "all",
+}: {
+  data: InsightsPayload;
+  segment?: InsightSegment;
+}) {
+  const [viewType, setViewType] = useState<"customers" | "items">("customers");
   const [limit, setLimit] = useState<5 | 10>(5);
   const [sort, setSort] = useState<"revenue" | "qty">("revenue");
-  const columns: { key: "food" | "store" | "space"; title: string }[] = [
-    { key: "food", title: "Most Selling Food" },
-    { key: "store", title: "Most Selling Store Products" },
-    { key: "space", title: "Most Popular Spaces" },
+
+  const allItemColumns: {
+    key: "food" | "store" | "space" | "membership";
+    title: string;
+    icon: typeof Utensils;
+    borderBg: string;
+    titleColor: string;
+    iconColor: string;
+  }[] = [
+    {
+      key: "food",
+      title: "Most Selling Food",
+      icon: Utensils,
+      borderBg: "border-amber-200/90 bg-gradient-to-b from-amber-50/40 via-white to-white",
+      titleColor: "text-amber-900",
+      iconColor: "text-amber-600",
+    },
+    {
+      key: "space",
+      title: "Most Popular Spaces",
+      icon: Store,
+      borderBg: "border-indigo-200/90 bg-gradient-to-b from-indigo-50/40 via-white to-white",
+      titleColor: "text-indigo-900",
+      iconColor: "text-indigo-600",
+    },
+    {
+      key: "store",
+      title: "Most Selling Store Products",
+      icon: ShoppingBag,
+      borderBg: "border-teal-200/90 bg-gradient-to-b from-teal-50/40 via-white to-white",
+      titleColor: "text-teal-900",
+      iconColor: "text-teal-600",
+    },
+    {
+      key: "membership",
+      title: "Top Memberships",
+      icon: Crown,
+      borderBg: "border-purple-200/90 bg-gradient-to-b from-purple-50/40 via-white to-white",
+      titleColor: "text-purple-900",
+      iconColor: "text-purple-600",
+    },
   ];
+
+  const allCustomerColumns: {
+    key: "food" | "store" | "space" | "membership";
+    title: string;
+    icon: typeof Utensils;
+    borderBg: string;
+    titleColor: string;
+    iconColor: string;
+  }[] = [
+    {
+      key: "food",
+      title: "Top Food Customers",
+      icon: Utensils,
+      borderBg: "border-amber-200/90 bg-gradient-to-b from-amber-50/40 via-white to-white",
+      titleColor: "text-amber-900",
+      iconColor: "text-amber-600",
+    },
+    {
+      key: "space",
+      title: "Top Space Customers",
+      icon: Store,
+      borderBg: "border-indigo-200/90 bg-gradient-to-b from-indigo-50/40 via-white to-white",
+      titleColor: "text-indigo-900",
+      iconColor: "text-indigo-600",
+    },
+    {
+      key: "store",
+      title: "Top Store Customers",
+      icon: ShoppingBag,
+      borderBg: "border-teal-200/90 bg-gradient-to-b from-teal-50/40 via-white to-white",
+      titleColor: "text-teal-900",
+      iconColor: "text-teal-600",
+    },
+    {
+      key: "membership",
+      title: "Top Membership Customers",
+      icon: Crown,
+      borderBg: "border-purple-200/90 bg-gradient-to-b from-purple-50/40 via-white to-white",
+      titleColor: "text-purple-900",
+      iconColor: "text-purple-600",
+    },
+  ];
+
+  const columns = useMemo(() => {
+    const list = viewType === "customers" ? allCustomerColumns : allItemColumns;
+    if (segment === "all") {
+      return list.filter((c) => c.key !== "membership");
+    }
+    return list.filter((c) => c.key === segment);
+  }, [segment, viewType]);
+
+  const isSingle = columns.length === 1;
+
   return (
     <section className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <SectionTitle title="Top Performing Items" note="Completed final bills only" />
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <ChipGroup value={sort} onChange={setSort} options={[["revenue", "Revenue"], ["qty", "Quantity"]]} />
-          <ChipGroup value={String(limit) as "5" | "10"} onChange={value => setLimit(value === "10" ? 10 : 5)} options={[["5", "Top 5"], ["10", "Top 10"]]} />
+      <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+        <SectionTitle
+          title={viewType === "customers" ? "Top Performing Customers" : "Top Performing Items"}
+          note={viewType === "customers" ? "Ranked by highest purchase amount" : "Completed final bills only"}
+        />
+        <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 shrink-0">
+          <ChipGroup
+            value={viewType}
+            onChange={setViewType}
+            options={[
+              ["customers", "Customers"],
+              ["items", "Items"],
+            ]}
+          />
+          {viewType === "items" && segment !== "membership" && (
+            <ChipGroup value={sort} onChange={setSort} options={[["revenue", "Revenue"], ["qty", "Quantity"]]} />
+          )}
+          {(viewType === "customers" || segment !== "membership") && (
+            <ChipGroup
+              value={String(limit) as "5" | "10"}
+              onChange={value => setLimit(value === "10" ? 10 : 5)}
+              options={[["5", "Top 5"], ["10", "Top 10"]]}
+            />
+          )}
         </div>
       </div>
-      <div className="flex overflow-x-auto gap-3 pb-3 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 scrollbar-none snap-x snap-mandatory overscroll-x-contain">
+      <div
+        className={
+          isSingle
+            ? "w-full"
+            : "flex overflow-x-auto gap-3 pb-3 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 scrollbar-none snap-x snap-mandatory overscroll-x-contain"
+        }
+      >
         {columns.map(column => {
-          const rows = [...data.top[column.key]].sort((a, b) => sort === "qty" ? b.qty - a.qty : b.revenue - a.revenue).slice(0, limit);
-          const borderBg = column.key === "food"
-            ? "border-amber-200/90 bg-gradient-to-b from-amber-50/40 via-white to-white"
-            : column.key === "space"
-            ? "border-indigo-200/90 bg-gradient-to-b from-indigo-50/40 via-white to-white"
-            : "border-teal-200/90 bg-gradient-to-b from-teal-50/40 via-white to-white";
-          const titleColor = column.key === "food"
-            ? "text-amber-900"
-            : column.key === "space"
-            ? "text-indigo-900"
-            : "text-teal-900";
+          const IconComp = column.icon;
+
+          if (viewType === "customers") {
+            const customerRows: RankedCustomer[] = (data.topCustomers?.[column.key] || []).slice(0, limit);
+
+            return (
+              <article
+                key={column.key}
+                className={`${
+                  isSingle
+                    ? "w-full sm:max-w-xl"
+                    : "w-[85vw] max-w-[340px] sm:w-[340px] lg:w-auto shrink-0 snap-start"
+                } flex flex-col rounded-2xl border ${column.borderBg} p-3 sm:p-4 shadow-xs`}
+              >
+                <h3 className={`flex items-center gap-2 px-1 text-xs sm:text-sm font-bold ${column.titleColor}`}>
+                  <IconComp size={14} className={`${column.iconColor} shrink-0`} />
+                  <span>{column.title}</span>
+                </h3>
+                {customerRows.length === 0 ? (
+                  <p className="px-1 py-8 text-center text-xs text-slate-400">No customer purchases in this range.</p>
+                ) : (
+                  <ol className="mt-2 space-y-1.5 sm:space-y-2 flex-1">
+                    {customerRows.map((row, index) => (
+                      <RankCustomerRow key={`${row.name}-${row.phone || index}`} index={index + 1} row={row} kind={column.key} />
+                    ))}
+                  </ol>
+                )}
+              </article>
+            );
+          }
+
+          const rawRows: RankedItem[] =
+            column.key === "membership"
+              ? data.segments.find(s => s.key === "membership")?.top || []
+              : data.top[column.key] || [];
+
+          const rows = [...rawRows]
+            .sort((a, b) => (sort === "qty" ? b.qty - a.qty : b.revenue - a.revenue))
+            .slice(0, limit);
 
           return (
             <article
               key={column.key}
-              className={`w-[85vw] max-w-[340px] sm:w-[340px] lg:w-auto shrink-0 snap-start flex flex-col rounded-2xl border ${borderBg} p-3 shadow-xs`}
+              className={`${
+                isSingle
+                  ? "w-full sm:max-w-xl"
+                  : "w-[85vw] max-w-[340px] sm:w-[340px] lg:w-auto shrink-0 snap-start"
+              } flex flex-col rounded-2xl border ${column.borderBg} p-3 sm:p-4 shadow-xs`}
             >
-              <h3 className={`flex items-center gap-2 px-1 text-xs sm:text-sm font-bold ${titleColor}`}>
-                {column.key === "food" ? <Utensils size={14} className="text-amber-600 shrink-0" /> : column.key === "space" ? <Store size={14} className="text-indigo-600 shrink-0" /> : <ShoppingBag size={14} className="text-teal-600 shrink-0" />}
+              <h3 className={`flex items-center gap-2 px-1 text-xs sm:text-sm font-bold ${column.titleColor}`}>
+                <IconComp size={14} className={`${column.iconColor} shrink-0`} />
                 <span>{column.title}</span>
               </h3>
-              {rows.length === 0 ? <p className="px-1 py-8 text-center text-xs text-slate-400">Nothing sold in this range.</p> : (
+              {rows.length === 0 ? (
+                <p className="px-1 py-8 text-center text-xs text-slate-400">Nothing sold in this range.</p>
+              ) : (
                 <ol className="mt-2 space-y-1.5 sm:space-y-2 flex-1">
-                  {rows.map((row, index) => <RankRow key={row.name} index={index + 1} row={row} kind={column.key} />)}
+                  {rows.map((row, index) => (
+                    <RankRow key={row.name} index={index + 1} row={row} kind={column.key} />
+                  ))}
                 </ol>
               )}
             </article>
@@ -720,7 +1186,15 @@ function TopSection({ data }: { data: InsightsPayload }) {
   );
 }
 
-function RankRow({ index, row, kind }: { index: number; row: RankedItem; kind: "food" | "store" | "space" }) {
+function RankRow({
+  index,
+  row,
+  kind,
+}: {
+  index: number;
+  row: RankedItem;
+  kind: "food" | "store" | "space" | "membership";
+}) {
   const badgeStyle = index === 1
     ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white font-black shadow-2xs"
     : index === 2
@@ -742,8 +1216,10 @@ function RankRow({ index, row, kind }: { index: number; row: RankedItem; kind: "
             <Utensils size={13} className="text-amber-500/70" />
           ) : kind === "space" ? (
             <Store size={13} className="text-indigo-500/70" />
-          ) : (
+          ) : kind === "store" ? (
             <ShoppingBag size={13} className="text-teal-500/70" />
+          ) : (
+            <Crown size={13} className="text-purple-500/70" />
           )}
         </span>
       )}
@@ -751,10 +1227,66 @@ function RankRow({ index, row, kind }: { index: number; row: RankedItem; kind: "
         <p className="truncate text-xs font-bold text-slate-800">{row.name}</p>
         <p className="truncate text-[10px] text-slate-400">
           {kind === "store" && row.sku ? `${row.sku} · ` : ""}
-          {kind === "space" ? `${row.bookings || row.orders} bookings · ${row.hours || 0}h` : `${row.qty} sold · ${row.orders} bills`}
+          {kind === "space"
+            ? `${row.bookings || row.orders} bookings · ${row.hours || 0}h`
+            : kind === "membership"
+            ? `${row.orders || row.qty || 0} members · ${row.orders || 0} bills`
+            : `${row.qty} sold · ${row.orders} bills`}
         </p>
       </div>
       <span className="text-xs font-black text-slate-900 shrink-0">{inr(row.revenue)}</span>
+    </li>
+  );
+}
+
+function RankCustomerRow({
+  index,
+  row,
+  kind,
+}: {
+  index: number;
+  row: RankedCustomer;
+  kind: "food" | "store" | "space" | "membership";
+}) {
+  const badgeStyle =
+    index === 1
+      ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white font-black shadow-2xs"
+      : index === 2
+      ? "bg-gradient-to-r from-slate-300 to-slate-400 text-slate-800 font-bold"
+      : index === 3
+      ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white font-bold"
+      : "bg-purple-100 text-[#673DE6] font-bold";
+
+  const initials =
+    row.name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase())
+      .join("") || "U";
+
+  return (
+    <li className="flex items-center gap-2 rounded-xl bg-white border border-slate-100/90 p-2 shadow-2xs hover:border-purple-200 transition">
+      <span
+        className={`flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-lg text-[10px] sm:text-[11px] shrink-0 ${badgeStyle}`}
+      >
+        {index}
+      </span>
+      <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-purple-50 border border-purple-100 text-[#673DE6] font-extrabold text-[11px] sm:text-xs shrink-0">
+        {initials}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-bold text-slate-800">{row.name}</p>
+        <p className="truncate text-[10px] text-slate-400">
+          {row.phone ? `${row.phone} · ` : ""}
+          {kind === "space"
+            ? `${row.bills} ${row.bills === 1 ? "booking" : "bookings"}${row.qty ? ` · ${row.qty}h` : ""}`
+            : kind === "membership"
+            ? `${row.bills} ${row.bills === 1 ? "plan" : "plans"}${row.topItem ? ` · ${row.topItem}` : ""}`
+            : `${row.bills} ${row.bills === 1 ? "order" : "orders"}${row.topItem ? ` · ${row.topItem}` : ""}`}
+        </p>
+      </div>
+      <span className="text-xs font-black text-slate-900 shrink-0">{inr(row.spend)}</span>
     </li>
   );
 }
@@ -776,6 +1308,7 @@ function VisitorSection({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<VisitorRow | null>(null);
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 300);
@@ -812,92 +1345,312 @@ function VisitorSection({
 
   return (
     <section className="space-y-3">
-      <SectionTitle title="Visitor Analytics" note="One bill is one transaction. A visit is a unique day with a bill." />
-      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-[1fr_280px]">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
-          <article className="rounded-2xl border border-sky-200/90 bg-gradient-to-br from-sky-50/80 via-blue-50/20 to-white p-3 sm:p-4 shadow-xs">
-            <div className="flex items-center gap-1.5 text-sky-800">
-              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md bg-sky-100 text-sky-700">
-                <Users size={12} strokeWidth={2.5} />
-              </span>
-              <p className="text-[10px] sm:text-xs font-bold truncate">First-time visitors</p>
-            </div>
-            <p className="mt-1 sm:mt-1.5 text-xl sm:text-3xl font-black text-sky-950">{summary.firstTime}</p>
-            <p className="mt-0.5 text-[9px] sm:text-xs font-semibold text-sky-700 line-clamp-2 leading-tight">
-              {summary.firstShare}% of {summary.unique} unique customers
+      {/* ================= VISITOR ANALYTICS HERO CARD ================= */}
+      <div className="rounded-[28px] sm:rounded-[32px] border border-purple-100/70 bg-[#F9F8FD] p-4 sm:p-6 shadow-[0_4px_24px_rgba(103,61,230,0.04)]">
+        {/* Header */}
+        <div className="flex items-start gap-2.5 mb-4 sm:mb-5">
+          <span className="w-1.5 h-6 rounded-full bg-[#7C3AED] shrink-0 mt-0.5" />
+          <div>
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug">
+              Visitor Analytics
+            </h2>
+            <p className="text-xs sm:text-[13px] font-medium text-slate-500 mt-0.5">
+              One bill & one transaction. A visit is a unique day with a bill.
             </p>
-          </article>
-          <article className="rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/80 via-indigo-50/20 to-white p-3 sm:p-4 shadow-xs">
-            <div className="flex items-center gap-1.5 text-purple-800">
-              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md bg-purple-100 text-purple-700">
-                <Users size={12} strokeWidth={2.5} />
-              </span>
-              <p className="text-[10px] sm:text-xs font-bold truncate">Repeat visitors</p>
-            </div>
-            <p className="mt-1 sm:mt-1.5 text-xl sm:text-3xl font-black text-purple-950">{summary.repeat}</p>
-            <p className="mt-0.5 text-[9px] sm:text-xs font-semibold text-purple-700 line-clamp-2 leading-tight">
-              {summary.repeatShare}% · more than one visit
-            </p>
-          </article>
+          </div>
         </div>
-        <article className="rounded-2xl border border-indigo-100/90 bg-gradient-to-br from-indigo-50/25 via-white to-sky-50/20 p-3 shadow-xs">
-          {donut.length === 0 ? (
-            <p className="py-6 sm:py-10 text-center text-xs text-slate-400">No visitors.</p>
-          ) : (
-            <div className="h-28 sm:h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={donut} dataKey="value" nameKey="name" innerRadius={30} outerRadius={48} stroke="none">
-                    {donut.map(row => <Cell key={row.name} fill={row.color} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+
+        {/* Content Grid: 1 Column on Mobile (KPIs row then Donut), 2 Columns on Desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-stretch">
+          {/* Mobile: KPIs in 1 row (grid-cols-2). Desktop: Left column stacked (md:flex md:flex-col) */}
+          <div className="grid grid-cols-2 md:flex md:flex-col gap-2.5 sm:gap-3.5 md:gap-4 justify-between">
+            {/* Card 1: First-time visitors */}
+            <div className="flex-1 flex flex-col justify-between rounded-2xl md:rounded-[22px] border border-[#BAE6FD] bg-[#F0F9FF] p-3 sm:p-4 md:p-5 shadow-2xs">
+              <div>
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <div className="flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-md sm:rounded-lg bg-[#E0F2FE] text-[#0284C7]">
+                    <Users size={13} className="sm:w-4 sm:h-4" strokeWidth={2.2} />
+                  </div>
+                  <span className="text-[11px] sm:text-xs md:text-sm font-bold text-[#0284C7] truncate">
+                    First-time visitors
+                  </span>
+                </div>
+                <p className="mt-1.5 sm:mt-2.5 md:mt-3 text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                  {summary.firstTime}
+                </p>
+              </div>
+              <p className="mt-1.5 sm:mt-2 md:mt-3 text-[10px] sm:text-xs md:text-[13px] font-semibold text-[#0369A1] leading-tight line-clamp-2">
+                {summary.firstShare}% of {summary.unique} unique customers
+              </p>
             </div>
-          )}
-        </article>
+
+            {/* Card 2: Repeat visitors */}
+            <div className="flex-1 flex flex-col justify-between rounded-2xl md:rounded-[22px] border border-[#E9D5FF] bg-[#FAF5FF] p-3 sm:p-4 md:p-5 shadow-2xs">
+              <div>
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <div className="flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-md sm:rounded-lg bg-[#F3E8FF] text-[#7C3AED]">
+                    <Users size={13} className="sm:w-4 sm:h-4" strokeWidth={2.2} />
+                  </div>
+                  <span className="text-[11px] sm:text-xs md:text-sm font-bold text-[#7C3AED] truncate">
+                    Repeat visitors
+                  </span>
+                </div>
+                <p className="mt-1.5 sm:mt-2.5 md:mt-3 text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                  {summary.repeat}
+                </p>
+              </div>
+              <p className="mt-1.5 sm:mt-2 md:mt-3 text-[10px] sm:text-xs md:text-[13px] font-semibold text-[#6D28D9] leading-tight line-clamp-2">
+                {summary.repeatShare}% – more than one visit
+              </p>
+            </div>
+          </div>
+
+          {/* Right Column (Desktop) / Row 2 (Mobile): Donut Chart Card */}
+          <div className="flex flex-col justify-center rounded-2xl md:rounded-[24px] border border-slate-100/90 bg-white p-3.5 sm:p-5 md:p-6 shadow-xs">
+            {donut.length === 0 ? (
+              <p className="py-12 text-center text-xs text-slate-400">No visitors in this period.</p>
+            ) : (
+              <div className="w-full flex items-center justify-center gap-3.5 sm:gap-6 md:gap-8">
+                {/* Donut Chart with Center KPI */}
+                <div className="relative w-[130px] sm:w-[155px] md:w-[175px] aspect-square shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={donut}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="65%"
+                        outerRadius="92%"
+                        paddingAngle={3}
+                        stroke="none"
+                      >
+                        {donut.map(row => (
+                          <Cell key={row.name} fill={row.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(val, name) => [
+                          `${val} visitors (${summary.unique > 0 ? Math.round((Number(val) / summary.unique) * 1000) / 10 : 0}%)`,
+                          name,
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Center KPI Display */}
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span className="text-[6px] sm:text-[9.5px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      TOTAL VISITORS
+                    </span>
+                    <span className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 leading-tight my-0.5">
+                      {summary.unique}
+                    </span>
+                    <span className="text-[9px] sm:text-[10px] md:text-xs font-bold text-[#7C3AED]">
+                      {summary.repeatShare}% repeat
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pointers at Right Side Only */}
+                <div className="flex flex-col justify-center gap-2.5 sm:gap-3.5 min-w-0">
+                  {/* First-time Pointer */}
+                  <div className="flex items-start gap-2 text-slate-700">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#0284C7] shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] sm:text-xs font-bold text-slate-700 leading-tight">
+                        First-time:
+                      </p>
+                      <p className="text-xs sm:text-sm font-black text-slate-900 leading-tight mt-0.5">
+                        {summary.firstTime}{" "}
+                        <span className="text-[10px] sm:text-xs font-semibold text-slate-500">
+                          ({summary.firstShare}%)
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Repeat Pointer */}
+                  <div className="flex items-start gap-2 text-slate-700">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#7C3AED] shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] sm:text-xs font-bold text-slate-700 leading-tight">
+                        Repeat:
+                      </p>
+                      <p className="text-xs sm:text-sm font-black text-slate-900 leading-tight mt-0.5">
+                        {summary.repeat}{" "}
+                        <span className="text-[10px] sm:text-xs font-semibold text-slate-500">
+                          ({summary.repeatShare}%)
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-purple-100/90 bg-white p-3 sm:p-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            <ChipGroup value={bucket} onChange={setBucket} options={[["day", "Per day"], ["week", "Per week"], ["month", "Per month"]]} />
-            <ChipGroup value={visits} onChange={setVisits} options={[["all", "All"], ["1", "1 visit"], ["2", "2 visits"], ["3", "3+ visits"]]} />
+          <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 w-full sm:w-auto">
+            <ChipGroup
+              fullWidth
+              className="w-full sm:w-auto"
+              value={bucket}
+              onChange={setBucket}
+              options={[
+                ["day", "Per day"],
+                ["week", "Per week"],
+                ["month", "Per month"],
+              ]}
+            />
+            <ChipGroup
+              fullWidth
+              className="w-full sm:w-auto"
+              value={visits}
+              onChange={setVisits}
+              options={[
+                ["all", "All"],
+                ["1", "1 visit"],
+                ["2", "2 visits"],
+                ["3", "3+ visits"],
+              ]}
+            />
           </div>
-          <label className="flex items-center gap-1.5 rounded-xl border border-purple-200/80 bg-white px-2.5 py-1.5 w-full sm:w-auto shadow-2xs">
-            <Search size={13} className="text-purple-500 shrink-0" />
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name or phone..." className="w-full sm:w-44 bg-transparent text-xs outline-none font-medium" />
-          </label>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label className="flex items-center gap-1.5 rounded-xl border border-purple-200/80 bg-white px-2.5 py-1.5 flex-1 sm:w-48 shadow-2xs">
+              <Search size={13} className="text-purple-500 shrink-0" />
+              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name or phone..." className="w-full bg-transparent text-xs outline-none font-medium" />
+            </label>
+            {/* View Switcher for Desktop */}
+            <div className="hidden sm:flex rounded-xl bg-purple-50/80 p-0.5 border border-purple-100/80">
+              <button
+                type="button"
+                onClick={() => setViewMode("card")}
+                className={`p-1.5 rounded-lg transition cursor-pointer ${
+                  viewMode === "card" ? "bg-[#673DE6] text-white shadow-xs" : "text-slate-500 hover:text-slate-900"
+                }`}
+                title="Card View"
+              >
+                <LayoutGrid size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`p-1.5 rounded-lg transition cursor-pointer ${
+                  viewMode === "table" ? "bg-[#673DE6] text-white shadow-xs" : "text-slate-500 hover:text-slate-900"
+                }`}
+                title="Table View"
+              >
+                <List size={13} />
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="mt-3 overflow-x-auto -mx-1 sm:mx-0 rounded-xl border border-slate-100">
-          <table className="min-w-[620px] sm:min-w-full text-left text-xs whitespace-nowrap">
-            <thead className="text-[10px] uppercase tracking-wider bg-gradient-to-r from-purple-50/70 via-slate-50 to-indigo-50/70 text-slate-600 font-bold">
-              <tr>
-                {["Customer", "Phone", "Visits", "Bills", "First visit", "Last visit", "Spending", "Type"].map(heading => (
-                  <th key={heading} className="px-3 py-2.5 font-bold">{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+
+        {/* ================= CARD VIEW (DEFAULT & MOBILE - IMAGE 1) ================= */}
+        {viewMode === "card" ? (
+          <div className="mt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
               {rows.map(row => (
-                <tr key={row.key} onClick={() => setSelected(row)} className="cursor-pointer hover:bg-purple-50/40 transition">
-                  <td className="px-3 py-2.5 font-bold text-slate-800">{row.name}</td>
-                  <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px]">{row.phone || "—"}</td>
-                  <td className="px-3 py-2.5 font-semibold text-slate-700">{row.visits}</td>
-                  <td className="px-3 py-2.5 font-semibold text-slate-700">{row.bills}</td>
-                  <td className="px-3 py-2.5 text-slate-500">{pretty(row.firstVisit)}</td>
-                  <td className="px-3 py-2.5 text-slate-500">{pretty(row.lastVisit)}</td>
-                  <td className="px-3 py-2.5 font-black text-emerald-700">{inr(row.spend)}</td>
-                  <td className="px-3 py-2.5">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${row.visitType === "Repeat" ? "bg-purple-100 text-purple-700 border border-purple-200/80" : "bg-sky-100 text-sky-700 border border-sky-200/80"}`}>{row.visitType}</span>
-                  </td>
-                </tr>
+                <article
+                  key={row.key}
+                  onClick={() => setSelected(row)}
+                  className="group rounded-2xl border border-purple-100/90 bg-gradient-to-br from-white via-white to-purple-50/15 p-3 sm:p-3.5 shadow-2xs hover:border-[#673DE6]/40 hover:shadow-[0_4px_16px_rgba(103,61,230,0.08)] transition-all active:scale-[0.99] cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Customer header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-[#673DE6] transition">
+                            {row.name}
+                          </h4>
+                          {row.member && (
+                            <span className="shrink-0 rounded-md bg-purple-100 px-1.5 py-0.5 text-[9px] font-bold text-[#673DE6]">
+                              Member
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-mono text-slate-400 mt-0.5">{row.phone || "No phone"}</p>
+                      </div>
+                      <span
+                        className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                          row.visitType === "Repeat"
+                            ? "bg-purple-100 text-purple-700 border border-purple-200/80"
+                            : "bg-sky-100 text-sky-700 border border-sky-200/80"
+                        }`}
+                      >
+                        {row.visitType}
+                      </span>
+                    </div>
+
+                    {/* 3 Metric Pills */}
+                    <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-xl bg-purple-50/50 p-2 text-center border border-purple-100/60">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-medium block">Visits</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-800">{row.visits}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-medium block">Bills</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-800">{row.bills}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-medium block">Spent</span>
+                        <span className="text-xs sm:text-sm font-black text-emerald-600">{inr(row.spend)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dates footer */}
+                  <div className="mt-2.5 flex items-center justify-between text-[10px] text-slate-400 font-medium pt-2 border-t border-slate-100">
+                    <span>First: <strong className="text-slate-600 font-semibold">{pretty(row.firstVisit)}</strong></span>
+                    <span>Last: <strong className="text-slate-600 font-semibold">{pretty(row.lastVisit)}</strong></span>
+                  </div>
+                </article>
               ))}
-            </tbody>
-          </table>
-          {!loading && rows.length === 0 ? <p className="py-8 text-center text-xs text-slate-400">No customers match this frequency.</p> : null}
-          {loading ? <p className="flex items-center justify-center gap-2 py-4 text-xs text-purple-600 font-semibold"><Loader2 size={14} className="animate-spin" /> Loading visitors...</p> : null}
-        </div>
+            </div>
+            {!loading && rows.length === 0 ? (
+              <p className="py-8 text-center text-xs text-slate-400">No customers match this frequency.</p>
+            ) : null}
+            {loading ? (
+              <p className="flex items-center justify-center gap-2 py-4 text-xs text-purple-600 font-semibold">
+                <Loader2 size={14} className="animate-spin" /> Loading visitors...
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          /* ================= TABLE VIEW (OPTIONAL DESKTOP) ================= */
+          <div className="mt-3 overflow-x-auto -mx-1 sm:mx-0 rounded-xl border border-slate-100">
+            <table className="min-w-[620px] sm:min-w-full text-left text-xs whitespace-nowrap">
+              <thead className="text-[10px] uppercase tracking-wider bg-gradient-to-r from-purple-50/70 via-slate-50 to-indigo-50/70 text-slate-600 font-bold">
+                <tr>
+                  {["Customer", "Phone", "Visits", "Bills", "First visit", "Last visit", "Spending", "Type"].map(heading => (
+                    <th key={heading} className="px-3 py-2.5 font-bold">{heading}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map(row => (
+                  <tr key={row.key} onClick={() => setSelected(row)} className="cursor-pointer hover:bg-purple-50/40 transition">
+                    <td className="px-3 py-2.5 font-bold text-slate-800">{row.name}</td>
+                    <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px]">{row.phone || "—"}</td>
+                    <td className="px-3 py-2.5 font-semibold text-slate-700">{row.visits}</td>
+                    <td className="px-3 py-2.5 font-semibold text-slate-700">{row.bills}</td>
+                    <td className="px-3 py-2.5 text-slate-500">{pretty(row.firstVisit)}</td>
+                    <td className="px-3 py-2.5 text-slate-500">{pretty(row.lastVisit)}</td>
+                    <td className="px-3 py-2.5 font-black text-emerald-700">{inr(row.spend)}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${row.visitType === "Repeat" ? "bg-purple-100 text-purple-700 border border-purple-200/80" : "bg-sky-100 text-sky-700 border border-sky-200/80"}`}>{row.visitType}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!loading && rows.length === 0 ? <p className="py-8 text-center text-xs text-slate-400">No customers match this frequency.</p> : null}
+            {loading ? <p className="flex items-center justify-center gap-2 py-4 text-xs text-purple-600 font-semibold"><Loader2 size={14} className="animate-spin" /> Loading visitors...</p> : null}
+          </div>
+        )}
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
           <span className="font-semibold text-purple-700">{total} customers</span>
           <div className="flex gap-2">
@@ -981,7 +1734,16 @@ function PeakSection({ data }: { data: InsightsPayload }) {
     <section className="space-y-3 pb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <SectionTitle title="Peak Billing Hours" note="Time is taken from when bill was saved" />
-        <ChipGroup value={metric} onChange={setMetric} options={[["bills", "Number of bills"], ["revenue", "Revenue"]]} />
+        <ChipGroup
+          fullWidth
+          className="w-full sm:w-auto"
+          value={metric}
+          onChange={setMetric}
+          options={[
+            ["bills", "Number of bills"],
+            ["revenue", "Revenue"],
+          ]}
+        />
       </div>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <Mini icon={<Clock3 size={15} />} label="Most active" value={data.peak.busiestPeriod || "—"} theme="amber" />
@@ -1074,12 +1836,12 @@ function Mini({
 
 function SectionTitle({ title, note }: { title: string; note: string }) {
   return (
-    <div>
-      <div className="flex items-center gap-1.5">
-        <span className="h-3.5 w-1 rounded-full bg-[#673DE6]" />
-        <h2 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h2>
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="h-3.5 w-1 rounded-full bg-[#673DE6] shrink-0" />
+        <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{title}</h2>
       </div>
-      <p className="text-[10px] sm:text-[11px] text-slate-400 pl-2.5">{note}</p>
+      <p className="text-[10px] sm:text-[11px] text-slate-400 pl-2.5 truncate">{note}</p>
     </div>
   );
 }

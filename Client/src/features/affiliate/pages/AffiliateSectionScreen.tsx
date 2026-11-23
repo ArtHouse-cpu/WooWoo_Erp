@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import HapScreen from "@/features/network/pages/HapScreen";
 import AffiliateProgramScreen from "./AffiliateProgramScreen";
 
@@ -25,7 +25,6 @@ export default function AffiliateSectionScreen() {
     else nextParams.set("tab", next);
     setParams(nextParams, { replace: true });
   };
-
   return (
     <div className="min-w-0">
       <div className="border-b border-slate-200 bg-white px-3 sm:px-6">

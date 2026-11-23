@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { DashboardSidebar } from "../../components/dashboard/DashboardSidebar";
 import { HapJoinModal } from "../../components/dashboard/HapJoinModal";
+import { ShareBottomSheet } from "../../components/dashboard/ShareBottomSheet";
 import { useHapApplication } from "../../hooks/useHapApplication";
 import { authApi } from "../../services/auth.service";
 import type { WalletDashboard, ReferralDashboard } from "../../types/auth";
@@ -74,6 +75,7 @@ export default function HapProgramPage() {
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [applyOpen, setApplyOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const { application, loaded, refresh } = useHapApplication();
 
   const [walletData, setWalletData] = useState<WalletDashboard | null>(null);
@@ -135,20 +137,8 @@ export default function HapProgramPage() {
     }
   };
 
-  const handleShareLink = async (url: string) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Join WooWoo Art House (10% OFF)",
-          text: `Use my referral code ${referralCode} to get 10% OFF at WooWoo Art House!`,
-          url,
-        });
-      } catch {
-        // Ignored if cancelled
-      }
-    } else {
-      void copyToClipboard(url, "link");
-    }
+  const handleShareLink = () => {
+    setIsShareModalOpen(true);
   };
 
   // Derive Activities list from real referralData and walletData (with starter items if none yet)
@@ -506,6 +496,18 @@ export default function HapProgramPage() {
                       type="button"
                       onClick={() => {
                         setMenuDropdownOpen(false);
+                        handleShareLink();
+                      }}
+                      className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 active:bg-gray-100 cursor-pointer"
+                    >
+                      <Share2 size={20} className="text-gray-900 stroke-[2] shrink-0" />
+                      <span>Share</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuDropdownOpen(false);
                         navigate("/help");
                       }}
                       className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-gray-800 transition hover:bg-gray-50 active:bg-gray-100 cursor-pointer"
@@ -726,7 +728,7 @@ export default function HapProgramPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleShareLink(referralLink)}
+                  onClick={handleShareLink}
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
                 >
                   <Share2 size={12} />
@@ -786,7 +788,7 @@ export default function HapProgramPage() {
         {/* ================= HORIZONTAL TABS (ACTIVITIES | TIMELINE) ================= */}
         <div className="mb-5 border-b border-gray-100 pb-3 overflow-x-auto scrollbar-none">
           <div className="flex items-center gap-6 sm:gap-10 min-w-max whitespace-nowrap">
-            {/* Tab 1: Activities */}
+            {/* Tab 1: History */}
             <button
               type="button"
               onClick={() => setActiveTab("activities")}
@@ -886,7 +888,7 @@ export default function HapProgramPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search activities..."
+                  placeholder="Search history..."
                   className="w-full rounded-xl border border-gray-200/90 bg-gray-50/60 py-1.5 pl-8.5 pr-7 text-xs font-medium text-gray-900 outline-none transition focus:border-purple-500 focus:bg-white"
                 />
                 {searchQuery && (
@@ -905,7 +907,7 @@ export default function HapProgramPage() {
             {filteredActivities.length === 0 ? (
               <div className="rounded-2xl border border-gray-200/80 bg-white py-12 text-center shadow-xs">
                 <Activity size={36} className="mx-auto text-gray-300" />
-                <p className="mt-2 text-sm font-bold text-gray-800">No activities found</p>
+                <p className="mt-2 text-sm font-bold text-gray-800">No history found</p>
                 <p className="mt-1 text-xs text-gray-400 max-w-sm mx-auto">
                   When customers use your referral code or link for signups, orders, bookings, or memberships, they will appear here.
                 </p>
@@ -1006,15 +1008,15 @@ export default function HapProgramPage() {
             {/* Sub-category Filter Buttons */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               {[
-                { id: "all", label: "All Activity", count: allTimeline.length },
+                { id: "all", label: "History", count: allTimeline.length },
                 {
                   id: "earnings",
-                  label: "Earnings Only",
+                  label: "Earnings ",
                   count: allTimeline.filter((t) => t.isCredit).length,
                 },
                 {
                   id: "payouts",
-                  label: "Payouts Only",
+                  label: "Payouts ",
                   count: allTimeline.filter((t) => !t.isCredit).length,
                 },
               ].map((cat) => (
@@ -1141,6 +1143,17 @@ export default function HapProgramPage() {
           </div>
         </div>
       </div>
+      <ShareBottomSheet
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        referralCode={referralCode}
+        shareUrl={referralLink}
+        title="Share Referral Link"
+        subtitle="Invite friends & earn rewards"
+        rewardTitle="Earn rewards with every referral!"
+        rewardDescription="Give friends 10% OFF on all activities, passes & orders."
+        discountBadge="10% OFF Discount"
+      />
     </div>
   );
 }

@@ -58,7 +58,7 @@ const AVAILABILITY_OPTIONS = [
   {
     id: 'Morning',
     label: 'Morning',
-    time: '9 AM – 1 PM',
+    time: '8 AM – 1 PM',
     icon: Sunrise,
   },
   {

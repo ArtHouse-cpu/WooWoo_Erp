@@ -63,32 +63,32 @@ const calcDurationHours = (from: string, to: string) => {
   return Math.max(0, Math.round(((endM - startM) / 60) * 10) / 10);
 };
 
-/** Formats 24-hr "HH:MM" into 12-hr AM/PM format (e.g. "09:00 AM") */
+/** Formats 24-hr "HH:MM" into 12-hr AM/PM format (e.g. "08:00 AM") */
 const formatTimeSlotDisplay = (time24: string) => {
-  if (!time24) return '06:00 AM';
+  if (!time24) return '08:00 AM';
   const [hStr, mStr] = time24.split(':');
   let h = Number(hStr);
   const m = Number(mStr) || 0;
-  if (Number.isNaN(h)) h = 6;
+  if (Number.isNaN(h)) h = 8;
   if (h === 24) h = 0;
   const period = h >= 12 ? 'PM' : 'AM';
   const displayH = h % 12 === 0 ? 12 : h % 12;
   return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-/** Generates quick slot presets for the given duration */
+/** Generates quick slot presets for the given duration within 08:00 AM – 10:00 PM */
 const getQuickSlotsForDuration = (hours: number) => {
-  const dur = Math.max(1, Math.min(18, Math.round(hours || 1)));
+  const dur = Math.max(1, Math.min(14, Math.round(hours || 1)));
   const slots: {label: string; start: string; end: string}[] = [];
-  const candidateStarts = [9, 12, 15, 18, 20].filter(s => s + dur <= 24);
-  if (candidateStarts.length === 0 && 6 + dur <= 24) {
-    candidateStarts.push(6);
+  const candidateStarts = [8, 11, 14, 17, 19].filter(s => s + dur <= 22);
+  if (candidateStarts.length === 0 && 8 + dur <= 22) {
+    candidateStarts.push(8);
   }
 
   candidateStarts.forEach(startH => {
     const endH = startH + dur;
     const startStr = `${String(startH).padStart(2, '0')}:00`;
-    const endStr = endH === 24 ? '24:00' : `${String(endH).padStart(2, '0')}:00`;
+    const endStr = `${String(endH).padStart(2, '0')}:00`;
     slots.push({
       label: `${formatTimeSlotDisplay(startStr)} – ${formatTimeSlotDisplay(endStr)}`,
       start: startStr,
@@ -109,8 +109,8 @@ export function SpaceQueryModal({
   const [isPurposeDropdownOpen, setIsPurposeDropdownOpen] = useState(false);
   const [date, setDate] = useState('');
   const [durationHours, setDurationHours] = useState(3);
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('12:00');
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('11:00');
   const [guestsCount, setGuestsCount] = useState(15);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [foodVegRequired, setFoodVegRequired] = useState(false);
@@ -168,12 +168,12 @@ export function SpaceQueryModal({
     setStartTime(newStart);
     if (!newStart) return;
 
-    const [sh = 6, sm = 0] = newStart.split(':').map(Number);
+    const [sh = 8, sm = 0] = newStart.split(':').map(Number);
     const startM = sh * 60 + sm;
     let endM = startM + Math.round(durationHours * 60);
 
-    if (endM > 24 * 60) {
-      endM = 24 * 60;
+    if (endM > 22 * 60) {
+      endM = 22 * 60;
       const dur = Math.max(0.5, Math.round(((endM - startM) / 60) * 10) / 10);
       setDurationHours(dur);
     }
@@ -181,7 +181,7 @@ export function SpaceQueryModal({
     const endH = Math.floor(endM / 60);
     const endMin = endM % 60;
     setEndTime(
-      `${String(endH === 24 ? '24' : endH).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
+      `${String(endH).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
     );
   };
 
@@ -466,7 +466,7 @@ export function SpaceQueryModal({
               {/* 2. Select Date & Hours Required in Same Row */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <div>
-                  <label className="block text-[10px] font-medium text-slate-600 mb-1 truncate">
+                  <label className="block text-[8px] sm:text-[10px] font-medium text-slate-600 mb-1 truncate">
                     Select Date <span className="text-[#EA580C]">*</span>
                   </label>
                   <input
@@ -475,12 +475,12 @@ export function SpaceQueryModal({
                     value={date}
                     onChange={e => setDate(e.target.value)}
                     required
-                    className="w-full h-9 px-2.5 text-[10px] font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800 cursor-pointer"
+                    className="w-full h-9 px-2 text-[8px] sm:text-[10px] font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800 cursor-pointer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-medium text-slate-600 mb-1 truncate">
+                  <label className="block text-[8px] sm:text-[10px] font-medium text-slate-600 mb-1 truncate">
                     Hours Required <span className="text-[#EA580C]">*</span>
                   </label>
                   <div className="flex h-9 items-center justify-between rounded-xl border border-slate-200 bg-white px-2">
@@ -488,7 +488,7 @@ export function SpaceQueryModal({
                       type="button"
                       onClick={() => handleDurationChange(Math.max(1, durationHours - 1))}
                       disabled={durationHours <= 1}
-                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[10px] active:scale-95 transition cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[8px] sm:text-[10px] active:scale-95 transition cursor-pointer"
                       title="Decrease hours"
                     >
                       -
@@ -505,9 +505,9 @@ export function SpaceQueryModal({
                             handleDurationChange(Math.max(1, Math.min(18, val)));
                           }
                         }}
-                        className="w-7 sm:w-8 text-center text-[10px] font-medium text-slate-800 bg-transparent focus:outline-none"
+                        className="w-7 sm:w-8 text-center text-[8px] sm:text-[10px] font-medium text-slate-800 bg-transparent focus:outline-none"
                       />
-                      <span className="text-[10px] font-medium text-slate-600">
+                      <span className="text-[8px] sm:text-[10px] font-medium text-slate-600">
                         {durationHours === 1 ? 'Hour' : 'Hours'}
                       </span>
                     </div>
@@ -515,7 +515,7 @@ export function SpaceQueryModal({
                       type="button"
                       onClick={() => handleDurationChange(Math.min(18, durationHours + 1))}
                       disabled={durationHours >= 18}
-                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[10px] active:scale-95 transition cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[8px] sm:text-[10px] active:scale-95 transition cursor-pointer"
                       title="Increase hours"
                     >
                       +
@@ -527,11 +527,11 @@ export function SpaceQueryModal({
               {/* 3. Custom Time Slot Selection */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10px] font-medium text-slate-600">
+                  <label className="block text-[8px] sm:text-[10px] font-medium text-slate-600">
                     Select Time Slot <span className="text-[#EA580C]">*</span>
                   </label>
                   <span
-                    className={`text-[10px] font-medium ${
+                    className={`text-[8px] sm:text-[10px] font-medium ${
                       isValidTimeRange ? 'text-[#EA580C]' : 'text-rose-500'
                     }`}
                   >
@@ -544,27 +544,27 @@ export function SpaceQueryModal({
                   <div className="relative">
                     <input
                       type="time"
-                      min="06:00"
-                      max="23:59"
+                      min="08:00"
+                      max="22:00"
                       value={startTime}
                       onChange={e => handleStartTimeChange(e.target.value)}
-                      className="w-full h-9 px-2.5 text-[10px] font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                      className="w-full h-9 px-2 text-[8px] sm:text-[10px] font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
                       title="Start Time"
                       required
                     />
                   </div>
 
-                  <span className="text-[10px] font-medium text-slate-400 px-1 text-center">to</span>
+                  <span className="text-[8px] sm:text-[10px] font-medium text-slate-400 px-1 text-center">to</span>
 
                   {/* End Time Input */}
                   <div className="relative">
                     <input
                       type="time"
-                      min="06:00"
-                      max="23:59"
-                      value={endTime === '24:00' ? '00:00' : endTime}
+                      min="08:00"
+                      max="22:00"
+                      value={endTime === '24:00' ? '22:00' : endTime}
                       onChange={e => handleEndTimeChange(e.target.value)}
-                      className="w-full h-9 px-2.5 text-[10px] font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                      className="w-full h-9 px-2 text-[8px] sm:text-[10px] font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
                       title="End Time"
                       required
                     />
@@ -596,7 +596,7 @@ export function SpaceQueryModal({
 
                 {!isValidTimeRange && (
                   <p className="mt-1 text-[11px] sm:text-xs font-medium text-rose-500">
-                    End time must be at least 1 hour after start time (within 06:00 AM – 12:00 AM).
+                    End time must be at least 1 hour after start time (within 08:00 AM – 10:00 PM).
                   </p>
                 )}
               </div>

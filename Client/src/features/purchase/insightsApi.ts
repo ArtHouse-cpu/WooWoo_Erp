@@ -10,7 +10,7 @@ export type InsightPreset =
   | "year"
   | "custom";
 
-export type InsightSegment = "all" | "food" | "space" | "store";
+export type InsightSegment = "all" | "food" | "space" | "store" | "membership";
 export type InsightMembership = "all" | "member" | "nonmember";
 
 export type InsightQuery = {
@@ -19,6 +19,15 @@ export type InsightQuery = {
   to?: string;
   segment: InsightSegment;
   membership: InsightMembership;
+};
+
+export type RankedCustomer = {
+  name: string;
+  phone: string;
+  spend: number;
+  bills: number;
+  qty: number;
+  topItem?: string;
 };
 
 export type RankedItem = {
@@ -33,7 +42,7 @@ export type RankedItem = {
 };
 
 export type SegmentCard = {
-  key: "food" | "space" | "store";
+  key: "food" | "space" | "store" | "membership";
   label: string;
   revenue: number;
   share: number;
@@ -45,6 +54,9 @@ export type SegmentCard = {
   previousRevenue: number;
   changePct: number | null;
   top: RankedItem[];
+  activeMembers?: number;
+  expiredMembers?: number;
+  topSellingMembership?: string;
 };
 
 export type InsightsPayload = {
@@ -62,8 +74,17 @@ export type InsightsPayload = {
     otherBills: number;
     memberShare: number;
     otherShare: number;
+    activeMembers?: number;
+    expiredMembers?: number;
+    topSellingMembership?: string;
   };
   top: { food: RankedItem[]; space: RankedItem[]; store: RankedItem[] };
+  topCustomers?: {
+    food: RankedCustomer[];
+    space: RankedCustomer[];
+    store: RankedCustomer[];
+    membership: RankedCustomer[];
+  };
   visitors: {
     unique: number;
     firstTime: number;

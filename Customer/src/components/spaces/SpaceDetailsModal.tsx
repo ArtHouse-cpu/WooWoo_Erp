@@ -118,7 +118,7 @@ function formatDateDisplay(d: Date): string {
 }
 
 function formatTime12(time24: string): string {
-  if (!time24) return '06:00 AM';
+  if (!time24) return '08:00 AM';
   const [hStr, mStr] = time24.split(':');
   let h = parseInt(hStr, 10);
   const m = mStr ? mStr.padStart(2, '0') : '00';
@@ -487,9 +487,9 @@ export function SpaceDetailsModal({
   const calendarRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Custom Timing state
-  const [startTime, setStartTime] = useState(initialState?.startTime || '06:00');
-  const [endTime, setEndTime] = useState(initialState?.endTime || '09:00');
+  // Custom Timing state (Operating hours: 08:00 AM – 10:00 PM)
+  const [startTime, setStartTime] = useState(initialState?.startTime || '08:00');
+  const [endTime, setEndTime] = useState(initialState?.endTime || '11:00');
   const [showShareModal, setShowShareModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showCoworkingBookingModal, setShowCoworkingBookingModal] = useState(false);
@@ -1493,123 +1493,6 @@ export function SpaceDetailsModal({
                 </div>
               </div>
 
-              {/* Membership Discounts Card */}
-              <div className="rounded-2xl border border-purple-100 bg-[#FAF9FF] p-3.5 sm:p-4 text-left transition shadow-3xs">
-                {/* Header with Crown and Toggle */}
-                <div
-                  onClick={() => setIsDiscountsOpen(v => !v)}
-                  className="flex items-center justify-between gap-3 cursor-pointer select-none"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/60 shadow-3xs">
-                      <Crown className="h-5 w-5 text-amber-500 fill-amber-500" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-extrabold text-sm sm:text-base text-[#111111] leading-tight">
-                        Membership Discounts
-                      </h4>
-                      <p className="text-[11px] sm:text-xs font-medium text-slate-500 leading-tight mt-0.5 truncate">
-                        Get exclusive discounts and cashback on space bookings.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-purple-100/60 transition cursor-pointer"
-                    aria-label={isDiscountsOpen ? 'Collapse discounts' : 'Expand discounts'}
-                  >
-                    {isDiscountsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </button>
-                </div>
-
-                {/* Membership List */}
-                {isDiscountsOpen && (
-                  <div className="mt-3.5 space-y-2">
-                    {MEMBERSHIP_TIERS.map(tier => {
-                      const isSelected = selectedMembershipId === tier.id;
-                      const discountAmount = Math.round(activePrice * (tier.discountPercent / 100));
-                      const discountedPrice = Math.max(0, activePrice - discountAmount);
-                      const IconComponent = tier.icon;
-
-                      return (
-                        <div
-                          key={tier.id}
-                          onClick={() =>
-                            setSelectedMembershipId(prev => (prev === tier.id ? null : tier.id))
-                          }
-                          className={`flex items-center justify-between gap-2 rounded-2xl p-2.5 sm:p-3 transition cursor-pointer ${
-                            isSelected
-                              ? 'border-2 border-[#6344E7] bg-white shadow-xs'
-                              : 'border border-slate-100 bg-white hover:border-purple-200'
-                          }`}
-                        >
-                          {/* Left: Icon, Name, Subtitle */}
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tier.iconBg} ${tier.iconColor}`}
-                            >
-                              <IconComponent size={18} className="stroke-[2.2]" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs sm:text-sm font-extrabold text-[#111111] truncate">
-                                {tier.name}
-                              </p>
-                              <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
-                                Up to {tier.discountPercent}% OFF • {tier.cashbackPercent}% Cashback
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Right: Vertical divider, Savings, Prices, Radio button */}
-                          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                            <div className="h-7 w-px bg-slate-200" />
-                            <div className="text-right">
-                              <p className="text-[11px] sm:text-xs font-bold text-[#6344E7] leading-tight">
-                                Save ₹{formatInr(discountAmount)}
-                              </p>
-                              <div className="flex items-baseline justify-end gap-1 mt-0.5">
-                                <span className="text-xs sm:text-sm font-black text-[#111111]">
-                                  ₹{formatInr(discountedPrice)}
-                                </span>
-                                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 line-through">
-                                  ₹{formatInr(activePrice)}
-                                </span>
-                              </div>
-                            </div>
-                            {/* Radio circle */}
-                            <div
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                                isSelected ? 'border-[#6344E7]' : 'border-slate-300'
-                              }`}
-                            >
-                              {isSelected && (
-                                <div className="h-2.5 w-2.5 rounded-full bg-[#6344E7]" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Learn More About Membership link */}
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleNavigateToMembership(false);
-                      }}
-                      className="w-full mt-2 flex items-center justify-between rounded-2xl bg-[#F3E8FF] hover:bg-[#E9D5FF] px-3.5 py-2.5 text-[#6344E7] transition active:scale-[0.99] cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
-                        <Info size={16} className="shrink-0" />
-                        <span>Learn More About Membership</span>
-                      </div>
-                      <ChevronRight size={16} className="shrink-0" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
               {/* Best For Section */}
               <div className="space-y-2">
                 <h4 className="font-extrabold text-sm sm:text-base text-[#111111]">Best For</h4>
@@ -1824,15 +1707,18 @@ export function SpaceDetailsModal({
 
                       {/* Timing Presets */}
                       <div className="py-2.5 space-y-1.5 border-b border-slate-100">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Popular Slots</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Popular Slots</p>
+                          <span className="text-[9.5px] font-bold text-slate-400">08:00 AM – 10:00 PM</span>
+                        </div>
                         <div className="grid grid-cols-2 gap-1.5 text-xs">
                           {[
-                            { label: '06:00 – 09:00 AM', start: '06:00', end: '09:00' },
-                            { label: '09:00 – 12:00 PM', start: '09:00', end: '12:00' },
-                            { label: '12:00 – 03:00 PM', start: '12:00', end: '15:00' },
-                            { label: '03:00 – 06:00 PM', start: '15:00', end: '18:00' },
-                            { label: '06:00 – 09:00 PM', start: '18:00', end: '21:00' },
-                            { label: '06:00 – 11:00 PM', start: '18:00', end: '23:00' },
+                            { label: '08:00 – 11:00 AM', start: '08:00', end: '11:00' },
+                            { label: '11:00 – 02:00 PM', start: '11:00', end: '14:00' },
+                            { label: '02:00 – 05:00 PM', start: '14:00', end: '17:00' },
+                            { label: '05:00 – 08:00 PM', start: '17:00', end: '20:00' },
+                            { label: '07:00 – 10:00 PM', start: '19:00', end: '22:00' },
+                            { label: '08:00 – 10:00 PM', start: '20:00', end: '22:00' },
                           ].map(slot => (
                             <button
                               key={slot.label}
@@ -1856,12 +1742,17 @@ export function SpaceDetailsModal({
 
                       {/* Custom Start & End time inputs */}
                       <div className="pt-2.5 space-y-2">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Timing</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Timing</p>
+                          <span className="text-[9px] font-medium text-slate-400">Hours: 8 AM – 10 PM</span>
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Start Time</label>
                             <input
                               type="time"
+                              min="08:00"
+                              max="22:00"
                               value={startTime}
                               onChange={e => setStartTime(e.target.value)}
                               className="w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-extrabold text-slate-800 outline-none focus:border-[#6344E7]"
@@ -1871,6 +1762,8 @@ export function SpaceDetailsModal({
                             <label className="text-[10px] font-bold text-slate-500 block mb-0.5">End Time</label>
                             <input
                               type="time"
+                              min="08:00"
+                              max="22:00"
                               value={endTime}
                               onChange={e => setEndTime(e.target.value)}
                               className="w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-extrabold text-slate-800 outline-none focus:border-[#6344E7]"
@@ -1894,7 +1787,9 @@ export function SpaceDetailsModal({
               {/* Lowest Price from Membership Banner (Directly above Weekday/Weekend selector) */}
               <div
                 onClick={() => setIsDiscountsOpen(v => !v)}
-                className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/90 via-purple-50/40 to-white px-3.5 py-2.5 shadow-3xs cursor-pointer hover:border-amber-300 transition"
+                className={`flex items-center justify-between gap-2 rounded-2xl border bg-gradient-to-r from-amber-50/90 via-purple-50/40 to-white px-3.5 py-2.5 shadow-3xs cursor-pointer transition ${
+                  isDiscountsOpen ? 'border-[#6344E7] ring-1 ring-[#6344E7]/30' : 'border-amber-200/90 hover:border-amber-300'
+                }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-xs">
@@ -1915,9 +1810,112 @@ export function SpaceDetailsModal({
                 </div>
                 <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-[#6344E7] shrink-0">
                   <span>{selectedTier ? selectedTier.name : 'View Discounts'}</span>
-                  <ChevronRight size={13} className="stroke-[2.5]" />
+                  {isDiscountsOpen ? (
+                    <ChevronUp size={14} className="stroke-[2.5]" />
+                  ) : (
+                    <ChevronDown size={14} className="stroke-[2.5]" />
+                  )}
                 </div>
               </div>
+
+              {/* Membership Discounts Dropdown (toggled by View Discounts) */}
+              {isDiscountsOpen && (
+                <div className="rounded-2xl border border-purple-100 bg-[#FAF9FF] p-3 sm:p-3.5 text-left transition shadow-3xs space-y-2">
+                  <div className="flex items-center justify-between pb-1 border-b border-purple-100/70">
+                    <div className="flex items-center gap-1.5">
+                      <Crown className="h-4 w-4 text-amber-500 fill-amber-500" />
+                      <span className="text-xs sm:text-sm font-extrabold text-[#111111]">
+                        Membership Discounts
+                      </span>
+                    </div>
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500">
+                      Select your plan
+                    </span>
+                  </div>
+
+                  {MEMBERSHIP_TIERS.map(tier => {
+                    const isSelected = selectedMembershipId === tier.id;
+                    const discountAmount = Math.round(activePrice * (tier.discountPercent / 100));
+                    const discountedPrice = Math.max(0, activePrice - discountAmount);
+                    const IconComponent = tier.icon;
+
+                    return (
+                      <div
+                        key={tier.id}
+                        onClick={() =>
+                          setSelectedMembershipId(prev => (prev === tier.id ? null : tier.id))
+                        }
+                        className={`flex items-center justify-between gap-2 rounded-2xl p-2.5 sm:p-3 transition cursor-pointer ${
+                          isSelected
+                            ? 'border-2 border-[#6344E7] bg-white shadow-xs'
+                            : 'border border-slate-100 bg-white hover:border-purple-200'
+                        }`}
+                      >
+                        {/* Left: Icon, Name, Subtitle */}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tier.iconBg} ${tier.iconColor}`}
+                          >
+                            <IconComponent size={18} className="stroke-[2.2]" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm font-extrabold text-[#111111] truncate">
+                              {tier.name}
+                            </p>
+                            <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+                              Up to {tier.discountPercent}% OFF • {tier.cashbackPercent}% Cashback
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Right: Vertical divider, Savings, Prices, Radio button */}
+                        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                          <div className="h-7 w-px bg-slate-200" />
+                          <div className="text-right">
+                            <p className="text-[11px] sm:text-xs font-bold text-[#6344E7] leading-tight">
+                              Save ₹{formatInr(discountAmount)}
+                            </p>
+                            <div className="flex items-baseline justify-end gap-1 mt-0.5">
+                              <span className="text-xs sm:text-sm font-black text-[#111111]">
+                                ₹{formatInr(discountedPrice)}
+                              </span>
+                              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 line-through">
+                                ₹{formatInr(activePrice)}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Radio circle */}
+                          <div
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                              isSelected ? 'border-[#6344E7]' : 'border-slate-300'
+                            }`}
+                          >
+                            {isSelected && (
+                              <div className="h-2.5 w-2.5 rounded-full bg-[#6344E7]" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Learn More About Membership link */}
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleNavigateToMembership(false);
+                    }}
+                    className="w-full mt-2 flex items-center justify-between rounded-2xl bg-[#F3E8FF] hover:bg-[#E9D5FF] px-3.5 py-2.5 text-[#6344E7] transition active:scale-[0.99] cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
+                      <Info size={16} className="shrink-0" />
+                      <span>Learn More About Membership</span>
+                    </div>
+                    <ChevronRight size={16} className="shrink-0" />
+                  </button>
+                </div>
+              )}
 
               {/* Weekday & Weekend Segmented Control & Price Display */}
               <div className="flex items-center justify-between gap-3 pt-1">
