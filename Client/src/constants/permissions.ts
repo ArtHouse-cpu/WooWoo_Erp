@@ -574,6 +574,7 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
  */
 export const MENU_PERMISSION_MAP: Record<string, Permission | Permission[]> = {
   "/": PERMISSIONS.DASHBOARD_READ,
+  "/insights-analytics": PERMISSIONS.DASHBOARD_READ,
   "/pos": PERMISSIONS.INVOICE_READ,
   "/invoices": PERMISSIONS.INVOICE_READ,
   "/payments": PERMISSIONS.INVOICE_READ,

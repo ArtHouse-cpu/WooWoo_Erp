@@ -1,10 +1,8 @@
-import {Link, useLocation, useNavigate} from 'react-router-dom';
-import {Crown, LogOut, Store, X} from 'lucide-react';
+import {Link, useLocation} from 'react-router-dom';
+import {ChevronRight, Crown, Store, User, X} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {BrandMark} from '../auth/AuthShell';
 import {dashboardNav} from '../../data/dashboard';
-import {useAuthStore} from '../../store/authStore';
-import {authApi} from '../../services/auth.service';
 import {useCspApplication} from '../../hooks/useCspApplication';
 
 type Props = {
@@ -16,23 +14,10 @@ type Props = {
 
 export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgramsClick}: Props) {
   const location = useLocation();
-  const navigate = useNavigate();
-  const logout = useAuthStore(s => s.logout);
   const {application} = useCspApplication();
   const isDrawer = mode === 'drawer';
 
-  const sections = ['Main', 'Account'] as const;
-
-  const onLogout = async () => {
-    try {
-      await authApi.logout();
-    } catch {
-      // ignore
-    }
-    logout();
-    onClose?.();
-    navigate('/login', {replace: true});
-  };
+  const sections = ['Main'] as const;
 
   const panel = (
     <div className="flex h-full w-[280px] flex-col bg-white">
@@ -150,13 +135,25 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
             Upgrade Now
           </Link>
         </div>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FECACA] py-2.5 text-[13px] font-semibold text-[#DC2626]"
+        <Link
+          to="/profile"
+          onClick={onClose}
+          className={`flex w-full items-center justify-between rounded-2xl border px-3.5 py-2.5 text-[13px] font-semibold transition ${
+            location.pathname === '/profile'
+              ? 'border-[#C4B5FD] bg-[#F5F0FF] text-[#673DE6]'
+              : 'border-slate-200 bg-white text-[#374151] hover:border-slate-300 hover:bg-slate-50'
+          }`}
         >
-          <LogOut className="h-4 w-4" /> Logout
-        </button>
+          <span className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            My Profile
+          </span>
+          <ChevronRight
+            className={`h-4 w-4 shrink-0 transition-colors ${
+              location.pathname === '/profile' ? 'text-[#673DE6]' : 'text-[#9CA3AF]'
+            }`}
+          />
+        </Link>
       </div>
     </div>
   );

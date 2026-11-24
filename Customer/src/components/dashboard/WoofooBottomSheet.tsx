@@ -79,7 +79,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
       title: 'Sip & Paint',
       subtitle: 'Create. Sip. Smile.',
       icon: Palette,
-      image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=400&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/image/upload/f_auto,q_auto/Screenshot_2026-07-18_145435',
       height: 'h-[230px]',
     },
     {
@@ -88,7 +88,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
       title: 'Eat & Work',
       subtitle: 'Fuel your ideas.',
       icon: Laptop,
-      image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/image/upload/f_auto,q_auto/IMG_4076',
       height: 'h-[110px]',
     },
     {
@@ -97,7 +97,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
       title: 'Friends Chill',
       subtitle: 'Good food. Great company.',
       icon: Users,
-      image: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?auto=format&fit=crop&w=400&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795440377/IMG_4078.png',
       height: 'h-[110px]',
     },
     {
@@ -106,7 +106,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
       title: 'Peace & Read',
       subtitle: 'Slow down. Be present.',
       icon: BookOpen,
-      image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=400&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795441266/Screenshot_2026-11-23_191021.png',
       height: 'h-[140px]',
     },
     {
@@ -223,7 +223,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
                     {/* Sip & Paint */}
                     <div className="relative h-[234px] overflow-hidden rounded-[20px] border border-black/[0.05] shadow-2xs col-start-1 col-end-2 row-start-1 row-end-3">
                       <img
-                        src="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=400&q=80"
+                        src="https://res.cloudinary.com/nciretjr/image/upload/f_auto,q_auto/Screenshot_2026-07-18_145435"
                         alt="Sip & Paint"
                         className="h-full w-full object-cover"
                       />
@@ -240,7 +240,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
                     {/* Eat & Work */}
                     <div className="relative h-[110px] overflow-hidden rounded-[20px] border border-black/[0.05] shadow-2xs col-start-2 col-end-3 row-start-1 row-end-2">
                       <img
-                        src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&q=80"
+                        src="https://res.cloudinary.com/nciretjr/image/upload/f_auto,q_auto/IMG_4076"
                         alt="Eat & Work"
                         className="h-full w-full object-cover"
                       />
@@ -257,7 +257,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
                     {/* Friends Chill */}
                     <div className="relative h-[110px] overflow-hidden rounded-[20px] border border-black/[0.05] shadow-2xs col-start-2 col-end-3 row-start-2 row-end-3">
                       <img
-                        src="https://images.unsplash.com/photo-1543007630-9710e4a00a20?auto=format&fit=crop&w=400&q=80"
+                        src="https://res.cloudinary.com/nciretjr/image/upload/v1795440377/IMG_4078.png"
                         alt="Friends Chill"
                         className="h-full w-full object-cover"
                       />
@@ -274,7 +274,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
                     {/* Peace & Read */}
                     <div className="relative h-[140px] overflow-hidden rounded-[20px] border border-black/[0.05] shadow-2xs col-start-1 col-end-2 row-start-3 row-end-4">
                       <img
-                        src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=400&q=80"
+                        src="https://res.cloudinary.com/nciretjr/image/upload/v1795441266/Screenshot_2026-11-23_191021.png"
                         alt="Peace & Read"
                         className="h-full w-full object-cover"
                       />
@@ -291,7 +291,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
                     {/* Ambience */}
                     <div className="relative h-[140px] overflow-hidden rounded-[20px] border border-black/[0.05] shadow-2xs col-start-2 col-end-3 row-start-3 row-end-4">
                       <img
-                        src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400&q=80"
+                        src="https://res.cloudinary.com/nciretjr/image/upload/f_auto,q_auto/Screenshot_2026-11-23_184057"
                         alt="Ambience"
                         className="h-full w-full object-cover"
                       />

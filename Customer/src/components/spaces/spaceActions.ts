@@ -72,6 +72,14 @@ export function spaceShareUrl(spaceId: string, membershipId?: string | null) {
   return membershipId ? `${base}?membership=${encodeURIComponent(membershipId)}` : base;
 }
 
+export function spacesCatalogShareUrl(type?: 'exclusive' | 'coworking' | string) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const lower = (type || '').toLowerCase();
+  if (lower === 'exclusive') return `${origin}/spaces/exclusive`;
+  if (lower === 'coworking') return `${origin}/spaces/coworking`;
+  return `${origin}/spaces`;
+}
+
 export function spacePriceLine(space: Pick<SpaceCard, 'weekdayPrice' | 'weekendPrice' | 'fromPrice'>) {
   const parts: string[] = [];
   if (space.weekdayPrice != null) parts.push(`Weekday ₹${formatInr(space.weekdayPrice)}/hr`);

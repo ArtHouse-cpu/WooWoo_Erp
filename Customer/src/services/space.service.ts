@@ -23,6 +23,16 @@ function pickSpaceImage(row: SpaceRecord): string | null {
   return resolveSpaceImageUrl(row.imageUrl || row.image || fromList || null);
 }
 
+export type SpaceHighlightItem = {
+  id?: string;
+  type: 'photo' | 'video';
+  url: string;
+  title?: string;
+  category?: 'parties' | 'shows' | 'meetings' | 'workshops' | 'more' | string;
+  duration?: string;
+  order?: number;
+};
+
 export type SpaceRecord = {
   _id: string;
   name: string;
@@ -39,6 +49,9 @@ export type SpaceRecord = {
   images?: string[] | null;
   videoUrl?: string | null;
   videos?: string[] | null;
+  highlights?: SpaceHighlightItem[] | null;
+  highlightImages?: string[] | null;
+  highlightVideos?: string[] | null;
 };
 
 export type SpaceCard = {
@@ -51,6 +64,9 @@ export type SpaceCard = {
   imageUrl: string | null;
   images: string[];
   videos: string[];
+  highlights?: SpaceHighlightItem[];
+  highlightImages?: string[];
+  highlightVideos?: string[];
   weekdayPrice: number | null;
   weekendPrice: number | null;
   fromPrice: number;
@@ -96,6 +112,46 @@ function collectRowVideos(row: SpaceRecord): string[] {
   return res;
 }
 
+function collectRowHighlights(row: SpaceRecord): SpaceHighlightItem[] {
+  if (!Array.isArray(row.highlights)) return [];
+  return row.highlights
+    .filter(h => h && (h.url || h.id))
+    .map((h, idx) => ({
+      ...h,
+      url: resolveSpaceImageUrl(h.url) || h.url,
+      type: h.type === 'video' ? ('video' as const) : ('photo' as const),
+      order: h.order ?? idx + 1,
+    }));
+}
+
+function collectRowHighlightImages(row: SpaceRecord): string[] {
+  const list = Array.isArray(row.highlightImages) ? row.highlightImages : [];
+  const set = new Set<string>();
+  const res: string[] = [];
+  for (const item of list) {
+    const resolved = resolveSpaceImageUrl(item);
+    if (resolved && !set.has(resolved)) {
+      set.add(resolved);
+      res.push(resolved);
+    }
+  }
+  return res;
+}
+
+function collectRowHighlightVideos(row: SpaceRecord): string[] {
+  const list = Array.isArray(row.highlightVideos) ? row.highlightVideos : [];
+  const set = new Set<string>();
+  const res: string[] = [];
+  for (const item of list) {
+    const resolved = resolveSpaceImageUrl(item);
+    if (resolved && !set.has(resolved)) {
+      set.add(resolved);
+      res.push(resolved);
+    }
+  }
+  return res;
+}
+
 /** Weekday and weekend rows for the same space become one card. */
 export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
   if (!Array.isArray(rows)) return [];
@@ -111,6 +167,9 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
 
     const rowImages = collectRowImages(row);
     const rowVideos = collectRowVideos(row);
+    const rowHighlights = collectRowHighlights(row);
+    const rowHighlightImages = collectRowHighlightImages(row);
+    const rowHighlightVideos = collectRowHighlightVideos(row);
 
     if (!existing) {
       grouped.set(key, {
@@ -123,6 +182,9 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
         imageUrl: pickSpaceImage(row),
         images: rowImages,
         videos: rowVideos,
+        highlights: rowHighlights,
+        highlightImages: rowHighlightImages,
+        highlightVideos: rowHighlightVideos,
         weekdayPrice: isWeekend ? null : price,
         weekendPrice: isWeekend ? price : null,
         fromPrice: price,
@@ -139,6 +201,22 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
     }
     for (const vid of rowVideos) {
       if (!existing.videos.includes(vid)) existing.videos.push(vid);
+    }
+    if (rowHighlights.length > 0) {
+      existing.highlights = existing.highlights || [];
+      for (const hl of rowHighlights) {
+        if (!existing.highlights.some(h => h.url === hl.url)) {
+          existing.highlights.push(hl);
+        }
+      }
+    }
+    for (const img of rowHighlightImages) {
+      existing.highlightImages = existing.highlightImages || [];
+      if (!existing.highlightImages.includes(img)) existing.highlightImages.push(img);
+    }
+    for (const vid of rowHighlightVideos) {
+      existing.highlightVideos = existing.highlightVideos || [];
+      if (!existing.highlightVideos.includes(vid)) existing.highlightVideos.push(vid);
     }
     if (!existing.description && row.description) {
       existing.description = String(row.description).trim();
@@ -210,6 +288,21 @@ export async function fetchPublicSpace(id: string, signal?: AbortSignal): Promis
   const images = rawImages.map(resolveSpaceImageUrl).filter(Boolean) as string[];
   const videos = rawVideos.map(resolveSpaceImageUrl).filter(Boolean) as string[];
 
+  const rawHighlights = Array.isArray(space.highlights)
+    ? space.highlights.map((h: any, idx: number) => ({
+        ...h,
+        url: resolveSpaceImageUrl(h.url) || h.url,
+        type: h.type === 'video' ? 'video' : 'photo',
+        order: h.order ?? idx + 1,
+      }))
+    : [];
+  const rawHighlightImages = (Array.isArray(space.highlightImages) ? space.highlightImages : [])
+    .map(resolveSpaceImageUrl)
+    .filter(Boolean) as string[];
+  const rawHighlightVideos = (Array.isArray(space.highlightVideos) ? space.highlightVideos : [])
+    .map(resolveSpaceImageUrl)
+    .filter(Boolean) as string[];
+
   return {
     id: String(space.id || id),
     name: String(space.name || '').trim(),
@@ -220,6 +313,9 @@ export async function fetchPublicSpace(id: string, signal?: AbortSignal): Promis
     imageUrl: resolveSpaceImageUrl(space.imageUrl),
     images,
     videos,
+    highlights: rawHighlights,
+    highlightImages: rawHighlightImages,
+    highlightVideos: rawHighlightVideos,
     weekdayPrice: space.weekdayPrice == null ? null : Math.max(0, Number(space.weekdayPrice) || 0),
     weekendPrice: space.weekendPrice == null ? null : Math.max(0, Number(space.weekendPrice) || 0),
     fromPrice: Math.max(0, Number(space.fromPrice) || 0),

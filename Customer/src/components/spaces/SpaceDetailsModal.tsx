@@ -675,6 +675,44 @@ export function SpaceDetailsModal({
   // Highlights media aggregation matching reference UI (media_1794653412858_f89dae6b.jpg)
   const highlightMedia = useMemo<MediaModalItem[]>(() => {
     const spaceName = space?.name || 'Space';
+    if (space?.highlights && space.highlights.length > 0) {
+      return space.highlights.map((h, i) => ({
+        id: h.id || `hl-${i}`,
+        type: h.type === 'video' ? 'video' : 'photo',
+        url: h.url,
+        title: h.title || `${spaceName} - Highlight ${i + 1}`,
+        category: (h.category as any) || 'more',
+        duration: h.duration,
+        order: h.order ?? i + 1,
+      }));
+    }
+    const combined: MediaModalItem[] = [];
+    if (space?.highlightImages && space.highlightImages.length > 0) {
+      space.highlightImages.forEach((url, i) => {
+        combined.push({
+          id: `hl-img-${i}`,
+          type: 'photo',
+          category: 'parties',
+          url,
+          title: `${spaceName} - Photo ${i + 1}`,
+          order: combined.length + 1,
+        });
+      });
+    }
+    if (space?.highlightVideos && space.highlightVideos.length > 0) {
+      space.highlightVideos.forEach((url, i) => {
+        combined.push({
+          id: `hl-vid-${i}`,
+          type: 'video',
+          category: 'shows',
+          url,
+          title: `${spaceName} - Video ${i + 1}`,
+          order: combined.length + 1,
+        });
+      });
+    }
+    if (combined.length > 0) return combined;
+
     return [
       {
         id: 'hl-party-1',
@@ -742,6 +780,26 @@ export function SpaceDetailsModal({
       },
     ];
   }, [space]);
+
+  const mediaCategoryCounts = useMemo(() => {
+    const counts = {
+      all: highlightMedia.length,
+      parties: 0,
+      shows: 0,
+      meetings: 0,
+      workshops: 0,
+      more: 0,
+    };
+    for (const m of highlightMedia) {
+      const cat = (m.category || 'more') as keyof typeof counts;
+      if (counts[cat] !== undefined) {
+        counts[cat]++;
+      } else {
+        counts.more++;
+      }
+    }
+    return counts;
+  }, [highlightMedia]);
 
   const categoryFilteredMedia = useMemo(() => {
     if (mediaCategory === 'all') return highlightMedia;
@@ -2054,93 +2112,91 @@ export function SpaceDetailsModal({
               </div>
 
               {/* Filter Pills Row */}
-              {!isCoworking && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {/* All (8) */}
-                  <button
-                    type="button"
-                    onClick={() => setMediaCategory('all')}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                      mediaCategory === 'all'
-                        ? 'bg-[#6344E7] text-white shadow-xs'
-                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>All ({highlightMedia.length})</span>
-                  </button>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {/* All */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory('all')}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'all'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>All ({mediaCategoryCounts.all})</span>
+                </button>
 
-                  {/* Parties (3) */}
-                  <button
-                    type="button"
-                    onClick={() => setMediaCategory(c => (c === 'parties' ? 'all' : 'parties'))}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                      mediaCategory === 'parties'
-                        ? 'bg-[#6344E7] text-white shadow-xs'
-                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <PartyPopper size={14} className={mediaCategory === 'parties' ? 'text-white' : 'text-[#7C3AED]'} />
-                    <span>Parties (3)</span>
-                  </button>
+                {/* Parties */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'parties' ? 'all' : 'parties'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'parties'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <PartyPopper size={14} className={mediaCategory === 'parties' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Parties ({mediaCategoryCounts.parties})</span>
+                </button>
 
-                  {/* Shows (2) */}
-                  <button
-                    type="button"
-                    onClick={() => setMediaCategory(c => (c === 'shows' ? 'all' : 'shows'))}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                      mediaCategory === 'shows'
-                        ? 'bg-[#6344E7] text-white shadow-xs'
-                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Drama size={14} className={mediaCategory === 'shows' ? 'text-white' : 'text-[#7C3AED]'} />
-                    <span>Shows (2)</span>
-                  </button>
+                {/* Shows */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'shows' ? 'all' : 'shows'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'shows'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Drama size={14} className={mediaCategory === 'shows' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Shows ({mediaCategoryCounts.shows})</span>
+                </button>
 
-                  {/* Meetings (1) */}
-                  <button
-                    type="button"
-                    onClick={() => setMediaCategory(c => (c === 'meetings' ? 'all' : 'meetings'))}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                      mediaCategory === 'meetings'
-                        ? 'bg-[#6344E7] text-white shadow-xs'
-                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Users size={14} className={mediaCategory === 'meetings' ? 'text-white' : 'text-[#7C3AED]'} />
-                    <span>Meetings (1)</span>
-                  </button>
+                {/* Meetings */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'meetings' ? 'all' : 'meetings'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'meetings'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Users size={14} className={mediaCategory === 'meetings' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Meetings ({mediaCategoryCounts.meetings})</span>
+                </button>
 
-                  {/* Workshops (1) */}
-                  <button
-                    type="button"
-                    onClick={() => setMediaCategory(c => (c === 'workshops' ? 'all' : 'workshops'))}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                      mediaCategory === 'workshops'
-                        ? 'bg-[#6344E7] text-white shadow-xs'
-                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Palette size={14} className={mediaCategory === 'workshops' ? 'text-white' : 'text-[#7C3AED]'} />
-                    <span>Workshops (1)</span>
-                  </button>
+                {/* Workshops */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'workshops' ? 'all' : 'workshops'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'workshops'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Palette size={14} className={mediaCategory === 'workshops' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Workshops ({mediaCategoryCounts.workshops})</span>
+                </button>
 
-                  {/* More ⌵ */}
-                  <button
-                    type="button"
-                    onClick={() => setMediaCategory(c => (c === 'more' ? 'all' : 'more'))}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                      mediaCategory === 'more'
-                        ? 'bg-[#6344E7] text-white shadow-xs'
-                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <MoreHorizontal size={14} className={mediaCategory === 'more' ? 'text-white' : 'text-[#7C3AED]'} />
-                    <span>More</span>
-                    <ChevronDown size={13} className={mediaCategory === 'more' ? 'text-white' : 'text-slate-500'} />
-                  </button>
-                </div>
-              )}
+                {/* More */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'more' ? 'all' : 'more'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'more'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <MoreHorizontal size={14} className={mediaCategory === 'more' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>More ({mediaCategoryCounts.more})</span>
+                  <ChevronDown size={13} className={mediaCategory === 'more' ? 'text-white' : 'text-slate-500'} />
+                </button>
+              </div>
 
               {/* 3-Column Highlights Media Grid */}
               {sortedMedia.length === 0 ? (
@@ -2153,15 +2209,46 @@ export function SpaceDetailsModal({
                   {sortedMedia.map((item, idx) => (
                     <div
                       key={item.id}
-                      onClick={() => openPhotoLightbox(sortedMedia, idx)}
-                      className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-100 cursor-pointer shadow-3xs hover:shadow-md transition active:scale-95"
+                      onClick={() => {
+                        if (item.type === 'video') {
+                          setPreviewVideo(item);
+                        } else {
+                          openPhotoLightbox(sortedMedia, idx);
+                        }
+                      }}
+                      className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-900 cursor-pointer shadow-3xs hover:shadow-md transition active:scale-95"
                     >
-                      <img
-                        src={item.url}
-                        alt={item.title || space.name}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
+                      {item.type === 'video' ? (
+                        <>
+                          <video
+                            src={item.url}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105 opacity-90"
+                          />
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-violet-700 shadow-md transition group-hover:scale-110">
+                              <Play size={16} className="ml-0.5 fill-violet-700 text-violet-700" />
+                            </span>
+                          </div>
+                          {item.duration ? (
+                            <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                              {item.duration}
+                            </span>
+                          ) : null}
+                          <span className="absolute top-1.5 left-1.5 rounded-md bg-violet-600/90 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                            Video
+                          </span>
+                        </>
+                      ) : (
+                        <img
+                          src={item.url}
+                          alt={item.title || space.name}
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>

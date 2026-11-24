@@ -64,10 +64,22 @@ const storage = multer.diskStorage({
 const fileFilter = (_req, file, cb) => {
   const isImage = /^image\/(jpeg|jpg|png|webp)$/.test(file.mimetype);
   const isVideo = /^video\/(mp4|webm|quicktime)$/.test(file.mimetype);
-  if ((file.fieldname === 'images' || file.fieldname === 'image') && isImage) {
+  if (
+    (file.fieldname === 'images' ||
+      file.fieldname === 'image' ||
+      file.fieldname === 'highlightImages') &&
+    isImage
+  ) {
     return cb(null, true);
   }
-  if (file.fieldname === 'video' && isVideo) return cb(null, true);
+  if (
+    (file.fieldname === 'video' ||
+      file.fieldname === 'highlightVideos' ||
+      file.fieldname === 'highlightVideo') &&
+    isVideo
+  ) {
+    return cb(null, true);
+  }
   cb(null, false);
 };
 
@@ -337,7 +349,7 @@ const resolveSpaceMedia = async req => {
   const imageFiles = [
     ...(req.files?.images || []),
     ...(req.files?.image || []),
-  ].filter(file => !file.size || file.size <= 5 * 1024 * 1024);
+  ].filter(file => !file.size || file.size <= 10 * 1024 * 1024);
   const uploadedImages = [];
   for (const file of imageFiles) {
     const url = await uploadSpaceFile(file);
@@ -349,6 +361,28 @@ const resolveSpaceMedia = async req => {
     const url = await uploadSpaceFile(file);
     if (url) uploadedVideos.push(url);
   }
+
+  // Highlight images upload to Cloudinary
+  const highlightImageFiles = (req.files?.highlightImages || []).filter(
+    file => !file.size || file.size <= 10 * 1024 * 1024,
+  );
+  const uploadedHighlightImages = [];
+  for (const file of highlightImageFiles) {
+    const url = await uploadSpaceFile(file);
+    if (url) uploadedHighlightImages.push(url);
+  }
+
+  // Highlight videos upload to Cloudinary
+  const highlightVideoFiles = [
+    ...(req.files?.highlightVideos || []),
+    ...(req.files?.highlightVideo || []),
+  ].slice(0, 8);
+  const uploadedHighlightVideos = [];
+  for (const file of highlightVideoFiles) {
+    const url = await uploadSpaceFile(file);
+    if (url) uploadedHighlightVideos.push(url);
+  }
+
   const kept =
     req.body.existingImages !== undefined
       ? String(req.body.existingImages || '')
@@ -369,12 +403,148 @@ const resolveSpaceMedia = async req => {
     ? [...keptVideos, ...uploadedVideos].slice(0, MAX_SPACE_VIDEOS)
     : uploadedVideos;
   const hasVideos = keptVideos !== null || uploadedVideos.length > 0;
+
+  // Kept Highlight Images
+  const keptHighlightImages =
+    req.body.existingHighlightImages !== undefined
+      ? String(req.body.existingHighlightImages || '')
+          .split(',')
+          .map(item => item.trim())
+          .filter(item => /^https?:\/\//i.test(item))
+      : null;
+  // Kept Highlight Videos
+  const keptHighlightVideos =
+    req.body.existingHighlightVideos !== undefined
+      ? String(req.body.existingHighlightVideos || '')
+          .split(',')
+          .map(item => item.trim())
+          .filter(item => /^https?:\/\//i.test(item))
+      : null;
+
+  const finalHighlightImages = keptHighlightImages !== null
+    ? [...keptHighlightImages, ...uploadedHighlightImages]
+    : uploadedHighlightImages;
+  const hasHighlightImages = keptHighlightImages !== null || uploadedHighlightImages.length > 0;
+
+  const finalHighlightVideos = keptHighlightVideos !== null
+    ? [...keptHighlightVideos, ...uploadedHighlightVideos]
+    : uploadedHighlightVideos;
+  const hasHighlightVideos = keptHighlightVideos !== null || uploadedHighlightVideos.length > 0;
+
+  // Structured highlights parsing
+  let structuredHighlights = undefined;
+  if (req.body.highlights !== undefined) {
+    try {
+      const parsed = typeof req.body.highlights === 'string'
+        ? JSON.parse(req.body.highlights)
+        : req.body.highlights;
+      if (Array.isArray(parsed)) {
+        let newImgIdx = 0;
+        let newVidIdx = 0;
+        structuredHighlights = parsed
+          .filter(item => item && (item.url || item.id || item.file))
+          .map((item, idx) => {
+            let itemUrl = String(item.url || '');
+            const itemType = item.type === 'video' ? 'video' : 'photo';
+            if (!/^https?:\/\//i.test(itemUrl)) {
+              if (itemType === 'photo' && newImgIdx < uploadedHighlightImages.length) {
+                itemUrl = uploadedHighlightImages[newImgIdx++];
+              } else if (itemType === 'video' && newVidIdx < uploadedHighlightVideos.length) {
+                itemUrl = uploadedHighlightVideos[newVidIdx++];
+              }
+            }
+            return {
+              type: itemType,
+              url: itemUrl,
+              title: String(item.title || ''),
+              category: String(item.category || 'more'),
+              duration: String(item.duration || ''),
+              order: Number(item.order ?? idx + 1),
+            };
+          })
+          .filter(item => /^https?:\/\//i.test(item.url));
+      }
+    } catch (err) {
+      console.warn('Could not parse req.body.highlights:', err);
+    }
+  }
+
+  // If structured highlights were not explicitly sent, build from highlight images and videos
+  if (!structuredHighlights && (hasHighlightImages || hasHighlightVideos)) {
+    structuredHighlights = [
+      ...finalHighlightImages.map((url, i) => ({
+        type: 'photo',
+        url,
+        title: '',
+        category: 'more',
+        order: i + 1,
+      })),
+      ...finalHighlightVideos.map((url, i) => ({
+        type: 'video',
+        url,
+        title: '',
+        category: 'more',
+        order: finalHighlightImages.length + i + 1,
+      })),
+    ];
+  } else if (structuredHighlights) {
+    // Append any newly uploaded highlight files not already in structuredHighlights
+    for (const url of uploadedHighlightImages) {
+      if (!structuredHighlights.some(h => h.url === url)) {
+        structuredHighlights.push({
+          type: 'photo',
+          url,
+          title: '',
+          category: 'more',
+          order: structuredHighlights.length + 1,
+        });
+      }
+    }
+    for (const url of uploadedHighlightVideos) {
+      if (!structuredHighlights.some(h => h.url === url)) {
+        structuredHighlights.push({
+          type: 'video',
+          url,
+          title: '',
+          category: 'more',
+          order: structuredHighlights.length + 1,
+        });
+      }
+    }
+  }
+
+  const allHighlightImageUrls = Array.from(
+    new Set([
+      ...finalHighlightImages,
+      ...(structuredHighlights || [])
+        .filter(h => h.type === 'photo' && /^https?:\/\//i.test(h.url))
+        .map(h => h.url),
+    ])
+  );
+  const allHighlightVideoUrls = Array.from(
+    new Set([
+      ...finalHighlightVideos,
+      ...(structuredHighlights || [])
+        .filter(h => h.type === 'video' && /^https?:\/\//i.test(h.url))
+        .map(h => h.url),
+    ])
+  );
+
   return {
     images: hasImages ? images.slice(0, 8) : undefined,
     imageUrl: hasImages ? images[0] || null : undefined,
     videos: hasVideos ? videos : undefined,
     videoUrl: hasVideos ? videos[0] || null : undefined,
     removeVideo: String(req.body.removeVideo || '').toLowerCase() === 'true',
+    highlights: structuredHighlights,
+    highlightImages:
+      hasHighlightImages || allHighlightImageUrls.length > 0
+        ? allHighlightImageUrls
+        : undefined,
+    highlightVideos:
+      hasHighlightVideos || allHighlightVideoUrls.length > 0
+        ? allHighlightVideoUrls
+        : undefined,
   };
 };
 
@@ -392,6 +562,15 @@ const applySpaceMedia = (payload, media) => {
   } else if (media.removeVideo) {
     payload.videoUrl = null;
     payload.videos = [];
+  }
+  if (media.highlights !== undefined) {
+    payload.highlights = media.highlights;
+  }
+  if (media.highlightImages !== undefined) {
+    payload.highlightImages = media.highlightImages;
+  }
+  if (media.highlightVideos !== undefined) {
+    payload.highlightVideos = media.highlightVideos;
   }
 };
 
@@ -468,6 +647,9 @@ export const createSpace = async (req, res) => {
         images: payload.images || [],
         videos: payload.videos || [],
         videoUrl: payload.videoUrl ?? null,
+        highlights: payload.highlights || [],
+        highlightImages: payload.highlightImages || [],
+        highlightVideos: payload.highlightVideos || [],
         createdBy,
       };
 
@@ -628,6 +810,12 @@ const publicSpaceCard = docs => {
   let imageUrl = null;
   let description = '';
   let capacity = 0;
+  const images = [];
+  const videos = [];
+  const highlights = [];
+  const highlightImages = [];
+  const highlightVideos = [];
+
   for (const row of rows) {
     const price = Math.max(0, Number(row.price) || 0);
     if (String(row.day || '').toLowerCase() === 'weekend') weekendPrice = price;
@@ -635,6 +823,24 @@ const publicSpaceCard = docs => {
     if (!imageUrl && row.imageUrl) imageUrl = String(row.imageUrl).trim();
     if (!description && row.description) description = String(row.description).trim();
     capacity = Math.max(capacity, Number(row.capacity) || 0);
+
+    if (Array.isArray(row.images)) {
+      for (const img of row.images) if (!images.includes(img)) images.push(img);
+    }
+    if (Array.isArray(row.videos)) {
+      for (const vid of row.videos) if (!videos.includes(vid)) videos.push(vid);
+    }
+    if (Array.isArray(row.highlights)) {
+      for (const hl of row.highlights) {
+        if (!highlights.some(h => h.url === hl.url)) highlights.push(hl);
+      }
+    }
+    if (Array.isArray(row.highlightImages)) {
+      for (const img of row.highlightImages) if (!highlightImages.includes(img)) highlightImages.push(img);
+    }
+    if (Array.isArray(row.highlightVideos)) {
+      for (const vid of row.highlightVideos) if (!highlightVideos.includes(vid)) highlightVideos.push(vid);
+    }
   }
   const prices = [weekdayPrice, weekendPrice].filter(value => value != null);
   return {
@@ -646,6 +852,11 @@ const publicSpaceCard = docs => {
     capacity,
     status: 'Available',
     imageUrl: imageUrl || null,
+    images,
+    videos,
+    highlights,
+    highlightImages,
+    highlightVideos,
     weekdayPrice,
     weekendPrice,
     fromPrice: prices.length ? Math.min(...prices) : 0,
@@ -872,6 +1083,12 @@ export const updateSpace = async (req, res) => {
         videos: payload.videos !== undefined ? payload.videos : existing.videos,
         videoUrl:
           payload.videoUrl !== undefined ? payload.videoUrl : existing.videoUrl,
+        highlights:
+          payload.highlights !== undefined ? payload.highlights : existing.highlights || [],
+        highlightImages:
+          payload.highlightImages !== undefined ? payload.highlightImages : existing.highlightImages || [],
+        highlightVideos:
+          payload.highlightVideos !== undefined ? payload.highlightVideos : existing.highlightVideos || [],
         createdBy: existing.createdBy,
       };
 

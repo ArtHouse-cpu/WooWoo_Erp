@@ -4,26 +4,41 @@ import {X, Share2, Copy, Check, MessageCircle, Link2, Sparkles} from 'lucide-rea
 import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
 import {SpacePhoto} from './SpacePhoto';
-import {formatInr, copySpaceLink, openNativeShare, spaceShareUrl} from './spaceActions';
+import {formatInr, copySpaceLink, spaceShareUrl} from './spaceActions';
+
+export type CustomSharePayload = {
+  title: string;
+  subtitle?: string;
+  url: string;
+  imageUrl?: string | null;
+  shareText?: string;
+};
 
 type ShareSpaceModalProps = {
-  space: SpaceCard | null;
+  space?: SpaceCard | null;
+  customShare?: CustomSharePayload | null;
   isOpen: boolean;
   onClose: () => void;
 };
 
-export function ShareSpaceModal({space, isOpen, onClose}: ShareSpaceModalProps) {
+export function ShareSpaceModal({space, customShare, isOpen, onClose}: ShareSpaceModalProps) {
   const [copied, setCopied] = useState(false);
 
-  if (!space) return null;
+  if (!space && !customShare) return null;
 
-  const url = spaceShareUrl(space.id);
+  const url = customShare ? customShare.url : (space ? spaceShareUrl(space.id) : '');
+  const title = customShare ? customShare.title : (space?.name || 'Space');
+  const subtitle = customShare ? (customShare.subtitle || 'Share with anyone') : 'Share with anyone';
 
   const handleCopyLink = async () => {
     try {
-      await copySpaceLink(space.id);
+      if (customShare) {
+        await navigator.clipboard.writeText(customShare.url);
+      } else if (space) {
+        await copySpaceLink(space.id);
+      }
       setCopied(true);
-      toast.success('Space link copied to clipboard');
+      toast.success('Link copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error('Failed to copy link');
@@ -31,21 +46,31 @@ export function ShareSpaceModal({space, isOpen, onClose}: ShareSpaceModalProps) 
   };
 
   const handleWhatsAppShare = () => {
-    const priceText = space.fromPrice ? `(From ₹${formatInr(space.fromPrice)}/hr)` : '';
-    const text = `Check out ${space.name} ${priceText} at WooWoo Art House!\n${url}`.trim();
+    let text = '';
+    if (customShare) {
+      text = customShare.shareText || `Check out ${customShare.title} at WooWoo Art House!\n${customShare.url}`;
+    } else if (space) {
+      const priceText = space.fromPrice ? `(From ₹${formatInr(space.fromPrice)}/hr)` : '';
+      text = `Check out ${space.name} ${priceText} at WooWoo Art House!\n${url}`.trim();
+    }
     const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleNativeShare = async () => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      const result = await openNativeShare(space, url);
-      if (result === 'shared') {
+      try {
+        await navigator.share({
+          title,
+          text: customShare?.shareText || `${title} at WooWoo Art House`,
+          url,
+        });
         toast.success('Shared successfully');
         onClose();
         return;
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
       }
-      if (result === 'cancelled') return;
     }
     await handleCopyLink();
   };
@@ -53,7 +78,7 @@ export function ShareSpaceModal({space, isOpen, onClose}: ShareSpaceModalProps) 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[95] flex items-end justify-center md:hidden">
+        <div className="fixed inset-0 z-[95] flex items-end sm:items-center justify-center p-0 sm:p-4">
           {/* Backdrop Overlay */}
           <motion.div
             initial={{opacity: 0}}
@@ -63,16 +88,16 @@ export function ShareSpaceModal({space, isOpen, onClose}: ShareSpaceModalProps) 
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-300"
           />
 
-          {/* Bottom Sheet Panel */}
+          {/* Bottom Sheet / Dialog Panel */}
           <motion.div
             initial={{y: '100%'}}
             animate={{y: 0}}
             exit={{y: '100%'}}
             transition={{type: 'spring', damping: 26, stiffness: 260}}
-            className="relative z-10 flex max-h-[88dvh] w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100 text-left"
+            className="relative z-10 flex max-h-[88dvh] w-full max-w-lg flex-col rounded-t-[32px] sm:rounded-[32px] bg-white shadow-2xl overflow-hidden border border-slate-100 text-left"
           >
             {/* Top Drag Handle */}
-            <div className="flex shrink-0 justify-center pt-3 pb-1">
+            <div className="flex shrink-0 justify-center pt-3 pb-1 sm:hidden">
               <div className="h-1.5 w-12 rounded-full bg-slate-200" />
             </div>
 
@@ -84,10 +109,10 @@ export function ShareSpaceModal({space, isOpen, onClose}: ShareSpaceModalProps) 
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-[#111111]">
-                    Share Space
+                    {customShare ? `Share ${customShare.title}` : 'Share Space'}
                   </h3>
                   <p className="text-xs font-semibold text-slate-500">
-                    Share with anyone
+                    {subtitle}
                   </p>
                 </div>
               </div>
@@ -104,30 +129,43 @@ export function ShareSpaceModal({space, isOpen, onClose}: ShareSpaceModalProps) 
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {/* Space Preview Card */}
+              {/* Space / Page Preview Card */}
               <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-[#FAFBFD] p-3">
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[#FFF9F3] flex items-center justify-center border border-slate-100">
-                  <SpacePhoto src={space.imageUrl} alt={space.name} />
+                  <SpacePhoto
+                    src={customShare?.imageUrl || space?.imageUrl || null}
+                    alt={title}
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-extrabold text-[#111111]">
-                    {space.name}
+                    {title}
                   </p>
                   <p className="text-xs font-semibold text-[#7C3AED]">
-                    {space.spaceType || space.category || 'Space'}
-                    {space.capacity ? ` · Up to ${space.capacity}` : ''}
+                    {customShare
+                      ? 'WooWoo Spaces'
+                      : `${space?.spaceType || space?.category || 'Space'}${
+                          space?.capacity ? ` · Up to ${space.capacity}` : ''
+                        }`}
                   </p>
-                  <p className="text-sm font-black text-slate-900 mt-0.5">
-                    From ₹{formatInr(space.fromPrice)}
-                    <span className="text-xs font-normal text-slate-500"> / hour</span>
-                  </p>
+                  {space && (
+                    <p className="text-sm font-black text-slate-900 mt-0.5">
+                      From ₹{formatInr(space.fromPrice)}
+                      <span className="text-xs font-normal text-slate-500"> / hour</span>
+                    </p>
+                  )}
+                  {customShare && (
+                    <p className="text-xs font-bold text-slate-600 mt-0.5 truncate">
+                      {customShare.subtitle || 'WooWoo Art House'}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Link Input with Copy button */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  Space Link
+                  {customShare ? 'Page Link' : 'Space Link'}
                 </label>
                 <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-1.5 focus-within:border-[#6344E7]">
                   <Link2 className="h-4 w-4 text-slate-400 ml-2 shrink-0" />

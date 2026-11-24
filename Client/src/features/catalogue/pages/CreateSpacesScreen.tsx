@@ -574,6 +574,16 @@ export default function CreateSpacesScreen() {
           Array.isArray(saved?.videos) && saved.videos.length
             ? saved.videos
             : media.existingVideos || [];
+        const highlightImages =
+          Array.isArray(saved?.highlightImages) && saved.highlightImages.length
+            ? saved.highlightImages
+            : media.existingHighlightImages || [];
+        const highlightVideos =
+          Array.isArray(saved?.highlightVideos) && saved.highlightVideos.length
+            ? saved.highlightVideos
+            : media.existingHighlightVideos || [];
+        const highlights = saved?.highlights ?? payload.highlights;
+
         await handleUpdateSpace(
           payload.weekendId,
           spacePayloadToFormData(
@@ -582,6 +592,7 @@ export default function CreateSpacesScreen() {
               day: "Weekend",
               price: payload.weekendPrice ?? 0,
               status: payload.weekendStatus ?? "Available",
+              highlights,
             },
             {
               imageFiles: [],
@@ -590,6 +601,10 @@ export default function CreateSpacesScreen() {
               existingVideos: videos.filter(Boolean) as string[],
               videoFile: null,
               removeVideo: videos.length === 0,
+              highlightImageFiles: [],
+              existingHighlightImages: highlightImages.filter(Boolean) as string[],
+              highlightVideoFiles: [],
+              existingHighlightVideos: highlightVideos.filter(Boolean) as string[],
             },
           ),
         );
