@@ -2203,6 +2203,17 @@ export const handleVerifyMembershipRazorpayPayment = async (
   };
 };
 
+export type SpaceHighlightItem = {
+  id?: string;
+  type: "photo" | "video";
+  url: string;
+  title?: string;
+  category?: string;
+  duration?: string;
+  order?: number;
+  file?: File;
+};
+
 export type SpacePayload = {
   _id?: string;
   name: string;
@@ -2220,6 +2231,9 @@ export type SpacePayload = {
   images?: string[];
   videoUrl?: string | null;
   videos?: string[];
+  highlights?: SpaceHighlightItem[];
+  highlightImages?: string[];
+  highlightVideos?: string[];
   createdAt?: string;
   updatedAt?: string;
   /** Legacy expanded list markers (from old dual-price docs) */
@@ -2318,6 +2332,10 @@ export type SpaceMediaUpload = {
   existingVideos?: string[];
   videoFile?: File | null;
   removeVideo?: boolean;
+  highlightImageFiles?: File[];
+  existingHighlightImages?: string[];
+  highlightVideoFiles?: File[];
+  existingHighlightVideos?: string[];
 };
 
 export const spacePayloadToFormData = (
@@ -2375,6 +2393,25 @@ export const spacePayloadToFormData = (
   }
   if (media && !(media instanceof File) && media.removeVideo) {
     fd.append("removeVideo", "true");
+  }
+
+  // Highlight images & videos
+  const highlightImageFiles =
+    media && !(media instanceof File) ? media.highlightImageFiles || [] : [];
+  for (const file of highlightImageFiles) fd.append("highlightImages", file);
+
+  const highlightVideoFiles =
+    media && !(media instanceof File) ? media.highlightVideoFiles || [] : [];
+  for (const file of highlightVideoFiles) fd.append("highlightVideos", file);
+
+  if (media && !(media instanceof File) && media.existingHighlightImages?.length) {
+    fd.append("existingHighlightImages", media.existingHighlightImages.join(","));
+  }
+  if (media && !(media instanceof File) && media.existingHighlightVideos?.length) {
+    fd.append("existingHighlightVideos", media.existingHighlightVideos.join(","));
+  }
+  if ((payload as any).highlights) {
+    fd.append("highlights", JSON.stringify((payload as any).highlights));
   }
   return fd;
 };

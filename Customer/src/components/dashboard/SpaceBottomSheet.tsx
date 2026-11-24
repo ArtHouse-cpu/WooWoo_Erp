@@ -433,7 +433,7 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     type="button"
                     onClick={() => {
                       onClose();
-                      navigate('/spaces');
+                      navigate('/spaces/exclusive');
                     }}
                     className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
                   >
@@ -458,7 +458,7 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     type="button"
                     onClick={() => {
                       onClose();
-                      navigate('/spaces');
+                      navigate('/spaces/coworking');
                     }}
                     className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
                   >

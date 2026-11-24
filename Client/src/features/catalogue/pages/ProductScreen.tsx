@@ -182,7 +182,7 @@ export default function ProductScreen() {
     return products.filter((p) => {
       if (!matchesSelectedSegment(p)) return false;
       const stock = Number(p.stockQty ?? 0);
-      const isOut = stock < 3;
+      const isOut = stock <= 0;
       if (stockFilter === "in_stock" && isOut) return false;
       if (stockFilter === "out_of_stock" && !isOut) return false;
       return true;
@@ -701,7 +701,7 @@ export default function ProductScreen() {
         header: "Stock",
         Cell: ({ cell }: { cell: any }) => {
           const qty = Number(cell.getValue() ?? 0);
-          const isOut = qty < 3;
+          const isOut = qty <= 0;
           return (
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -829,12 +829,12 @@ export default function ProductScreen() {
 
   const inStockComputed = useMemo(() => {
     if (stats.inStockCount > 0) return stats.inStockCount;
-    return products.filter((p) => Number(p.stockQty ?? 0) >= 3).length;
+    return products.filter((p) => Number(p.stockQty ?? 0) > 0).length;
   }, [stats.inStockCount, products]);
 
   const outOfStockComputed = useMemo(() => {
     if (stats.outOfStockCount > 0) return stats.outOfStockCount;
-    return products.filter((p) => Number(p.stockQty ?? 0) < 3).length;
+    return products.filter((p) => Number(p.stockQty ?? 0) <= 0).length;
   }, [stats.outOfStockCount, products]);
 
   const cards = [
@@ -1189,7 +1189,7 @@ export default function ProductScreen() {
           <div className="grid grid-cols-2 gap-3">
             {displayedMobileProducts.map((p, idx) => {
               const stock = Number(p.stockQty ?? 0);
-              const isOutOfStock = stock < 3;
+              const isOutOfStock = stock <= 0;
               const img =
                 (typeof p.imageUrl === "string" && p.imageUrl.trim()
                   ? p.imageUrl.trim()
@@ -1404,12 +1404,12 @@ export default function ProductScreen() {
                   <div className="flex flex-col items-end gap-1">
                     <span
                       className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        Number(viewProduct.stockQty ?? 0) < 3
+                        Number(viewProduct.stockQty ?? 0) <= 0
                           ? "bg-rose-100 text-rose-800"
                           : "bg-emerald-100 text-emerald-800"
                       }`}
                     >
-                      {Number(viewProduct.stockQty ?? 0) < 3
+                      {Number(viewProduct.stockQty ?? 0) <= 0
                         ? "Out of Stock"
                         : "In Stock"}
                     </span>

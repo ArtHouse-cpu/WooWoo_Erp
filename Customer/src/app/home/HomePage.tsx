@@ -2,13 +2,11 @@ import {useEffect, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
 import {TopNavbar, MobileHeader} from '../../components/dashboard/TopNavbar';
-import {HeroBanner, ProfileAsideCard} from '../../components/dashboard/HeroBanner';
+import {HeroBanner} from '../../components/dashboard/HeroBanner';
 import {
   ActionCards,
   ExploreGrid,
   MembershipBanner,
-  TopArtists,
-  UpcomingEvents,
 } from '../../components/dashboard/DashboardSections';
 import {SuppliesBottomSheet} from '../../components/dashboard/SuppliesBottomSheet';
 import {ServicesBottomSheet} from '../../components/dashboard/ServicesBottomSheet';
@@ -106,12 +104,6 @@ export default function HomePage() {
             <MembershipBanner />
             <ActionCards onActionClick={handleActionClick} />
           </div>
-
-          <aside className="sticky top-6 flex w-[340px] shrink-0 flex-col gap-5 self-start">
-            <ProfileAsideCard />
-            <UpcomingEvents />
-            <TopArtists />
-          </aside>
         </div>
 
         {/* Mobile / tablet (< xl) */}

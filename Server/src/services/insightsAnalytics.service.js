@@ -200,6 +200,9 @@ const loadInvoices = range => {
         membershipType: 1,
         grandTotal: 1,
         returnedAmount: 1,
+        mode: 1,
+        paymentStatus: 1,
+        paymentBreakdown: 1,
         items: {
           $map: {
             input: {$ifNull: ['$items', []]},
@@ -269,6 +272,104 @@ const addItem = (bucket, line, invoiceId) => {
   bucket.set(key, row);
 };
 
+const createPaymentBucket = () => ({
+  cash: 0,
+  upi: 0,
+  wallet: 0,
+  card: 0,
+  cashBills: 0,
+  upiBills: 0,
+  walletBills: 0,
+  cardBills: 0,
+  bills: 0,
+  total: 0,
+});
+
+const parseInvoicePayments = (invoice, net) => {
+  const pb = invoice.paymentBreakdown || {};
+  let cash = Math.max(0, Number(pb.cash) || 0);
+  let upi = Math.max(0, Number(pb.upi) || 0);
+  let wallet = Math.max(0, Number(pb.wallet) || 0);
+  let card = Math.max(0, Number(pb.card) || 0);
+  const totalPb = cash + upi + wallet + card;
+
+  if (totalPb <= 0) {
+    const mode = String(invoice.mode || '').trim().toLowerCase();
+    if (mode.includes('upi')) upi = net;
+    else if (mode.includes('wallet')) wallet = net;
+    else if (mode.includes('card')) card = net;
+    else cash = net;
+  } else if (net > 0 && Math.abs(totalPb - net) > 0.01) {
+    const scale = net / totalPb;
+    cash = roundMoney(cash * scale);
+    upi = roundMoney(upi * scale);
+    wallet = roundMoney(wallet * scale);
+    card = roundMoney(card * scale);
+  }
+
+  return { cash, upi, wallet, card };
+};
+
+const addPaymentToBucket = (bucket, pmts, revenue) => {
+  bucket.cash = roundMoney(bucket.cash + pmts.cash);
+  bucket.upi = roundMoney(bucket.upi + pmts.upi);
+  bucket.wallet = roundMoney(bucket.wallet + pmts.wallet);
+  bucket.card = roundMoney(bucket.card + pmts.card);
+  bucket.total = roundMoney(bucket.total + revenue);
+  bucket.bills += 1;
+  if (pmts.cash > 0) bucket.cashBills += 1;
+  if (pmts.upi > 0) bucket.upiBills += 1;
+  if (pmts.wallet > 0) bucket.walletBills += 1;
+  if (pmts.card > 0) bucket.cardBills += 1;
+};
+
+const formatPaymentBreakdown = bucket => {
+  const b = bucket || createPaymentBucket();
+  const total = roundMoney(b.cash + b.upi + b.wallet + b.card);
+  const effectiveTotal = total > 0 ? total : roundMoney(b.total || 0);
+  const pct = amt => (effectiveTotal > 0 ? Math.round((amt / effectiveTotal) * 1000) / 10 : 0);
+
+  const methods = [
+    {
+      method: 'cash',
+      label: 'Cash',
+      amount: roundMoney(b.cash),
+      percentage: pct(b.cash),
+      bills: b.cashBills || 0,
+    },
+    {
+      method: 'upi',
+      label: 'UPI',
+      amount: roundMoney(b.upi),
+      percentage: pct(b.upi),
+      bills: b.upiBills || 0,
+    },
+    {
+      method: 'wallet',
+      label: 'Wallet',
+      amount: roundMoney(b.wallet),
+      percentage: pct(b.wallet),
+      bills: b.walletBills || 0,
+    },
+  ];
+
+  if (b.card > 0 || b.cardBills > 0) {
+    methods.push({
+      method: 'card',
+      label: 'Card',
+      amount: roundMoney(b.card),
+      percentage: pct(b.card),
+      bills: b.cardBills || 0,
+    });
+  }
+
+  return {
+    total: effectiveTotal,
+    bills: b.bills || 0,
+    methods,
+  };
+};
+
 const passesFilters = (allocated, filters) => {
   if (filters.membership === 'member' && !allocated.member) return false;
   if (filters.membership === 'nonmember' && allocated.member) return false;
@@ -289,6 +390,12 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
     space: new Map(),
     store: new Map(),
   };
+  const payments = {
+    all: createPaymentBucket(),
+    food: createPaymentBucket(),
+    space: createPaymentBucket(),
+    store: createPaymentBucket(),
+  };
   let bills = 0;
   let revenue = 0;
 
@@ -303,6 +410,29 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
 
     bills += 1;
     revenue = roundMoney(revenue + invoiceRevenue);
+
+    const invoicePayments = parseInvoicePayments(invoice, invoiceRevenue);
+    addPaymentToBucket(payments.all, invoicePayments, invoiceRevenue);
+
+    const segRevMap = {};
+    for (const line of lines) {
+      if (line.revenue > 0) {
+        segRevMap[line.segment] = roundMoney((segRevMap[line.segment] || 0) + line.revenue);
+      }
+    }
+    for (const [seg, segRev] of Object.entries(segRevMap)) {
+      if (payments[seg]) {
+        const ratio = invoiceRevenue > 0 ? segRev / invoiceRevenue : 0;
+        const segPayments = {
+          cash: roundMoney(invoicePayments.cash * ratio),
+          upi: roundMoney(invoicePayments.upi * ratio),
+          wallet: roundMoney(invoicePayments.wallet * ratio),
+          card: roundMoney(invoicePayments.card * ratio),
+        };
+        addPaymentToBucket(payments[seg], segPayments, segRev);
+      }
+    }
+
     if (allocated.member) {
       membership.member = roundMoney(membership.member + invoiceRevenue);
       membership.memberBills += 1;
@@ -392,7 +522,7 @@ const rollup = (invoices, filters, {keepItems, keepCustomers, keepPeak}) => {
     }
   }
 
-  return {segments, membership, periods, weekdays, customers, segmentCustomers, bills, revenue};
+  return {segments, membership, periods, weekdays, customers, segmentCustomers, bills, revenue, payments};
 };
 
 const topRows = (bucket, limit = 30) =>
@@ -609,7 +739,7 @@ const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 
       Subscription.find({
         status: { $nin: ['cancelled', 'Cancelled', 'draft', 'Draft'] },
         invoiceDate: { $gte: range.current.start, $lte: range.current.end },
-      }).select('grandTotal amount membershipType membershipPlanId customerName customerPhone customerId').lean().catch(() => []),
+      }).select('grandTotal amount membershipType membershipPlanId customerName customerPhone customerId mode paymentBreakdown').lean().catch(() => []),
       Subscription.find({
         status: { $nin: ['cancelled', 'Cancelled', 'draft', 'Draft'] },
         invoiceDate: { $gte: range.previous.start, $lte: range.previous.end },
@@ -697,6 +827,14 @@ const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 
       if (!row.topItem) row.topItem = planName;
     }
 
+    const memPayments = createPaymentBucket();
+    for (const s of currentSubs || []) {
+      const sAmount = Number(s.grandTotal ?? s.amount ?? 0) || 0;
+      if (sAmount <= 0) continue;
+      const sPayments = parseInvoicePayments(s, sAmount);
+      addPaymentToBucket(memPayments, sPayments, sAmount);
+    }
+
     const topCustomers = [...memCustMap.values()]
       .sort((a, b) => b.spend - a.spend || b.bills - a.bills)
       .slice(0, 20);
@@ -710,6 +848,7 @@ const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 
       topSellingMembership,
       topSellingCount: topPlanCount,
       topCustomers,
+      payments: memPayments,
     };
   } catch (err) {
     console.error('loadMembershipStats error:', err);
@@ -722,6 +861,7 @@ const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 
       topSellingMembership: 'Standard',
       topSellingCount: 0,
       topCustomers: [],
+      payments: createPaymentBucket(),
     };
   }
 };
@@ -749,15 +889,38 @@ const buildInsights = async (range, filters) => {
   };
   const pictured = await attachImages(items);
   const total = roundMoney(current.revenue);
+  const memStats = await loadMembershipStats(range, current.membership.member, previous.membership.member);
+  const memShare = total > 0 ? Math.round((memStats.revenue / total) * 1000) / 10 : 0;
+
+  const allPaymentsCombined = {
+    cash: roundMoney(current.payments.all.cash + (memStats.payments?.cash || 0)),
+    upi: roundMoney(current.payments.all.upi + (memStats.payments?.upi || 0)),
+    wallet: roundMoney(current.payments.all.wallet + (memStats.payments?.wallet || 0)),
+    card: roundMoney(current.payments.all.card + (memStats.payments?.card || 0)),
+    cashBills: current.payments.all.cashBills + (memStats.payments?.cashBills || 0),
+    upiBills: current.payments.all.upiBills + (memStats.payments?.upiBills || 0),
+    walletBills: current.payments.all.walletBills + (memStats.payments?.walletBills || 0),
+    cardBills: current.payments.all.cardBills + (memStats.payments?.cardBills || 0),
+    bills: current.payments.all.bills + (memStats.payments?.bills || 0),
+    total: roundMoney(current.payments.all.total + (memStats.payments?.total || 0)),
+  };
+
+  const formattedPayments = {
+    all: formatPaymentBreakdown(allPaymentsCombined),
+    food: formatPaymentBreakdown(current.payments.food),
+    space: formatPaymentBreakdown(current.payments.space),
+    store: formatPaymentBreakdown(current.payments.store),
+    membership: formatPaymentBreakdown(memStats.payments || createPaymentBucket()),
+  };
+
   const segments = ['food', 'space', 'store'].map(key => {
     const row = segmentPayload(key, current.segments[key], previous.segments[key], range.days, spaceStats);
     row.share = total > 0 ? Math.round((row.revenue / total) * 1000) / 10 : 0;
     row.top = pictured[key].slice(0, 3);
+    row.payments = formattedPayments[key];
     return row;
   });
 
-  const memStats = await loadMembershipStats(range, current.membership.member, previous.membership.member);
-  const memShare = total > 0 ? Math.round((memStats.revenue / total) * 1000) / 10 : 0;
   segments.push({
     key: 'membership',
     label: 'Membership',
@@ -774,6 +937,7 @@ const buildInsights = async (range, filters) => {
     activeMembers: memStats.activeMembers,
     expiredMembers: memStats.expiredMembers,
     topSellingMembership: memStats.topSellingMembership,
+    payments: formattedPayments.membership,
   });
 
   const periodRows = PERIODS.map(period => ({
@@ -847,6 +1011,7 @@ const buildInsights = async (range, filters) => {
     },
     top: pictured,
     topCustomers,
+    payments: formattedPayments,
     visitors: visitorSummary(current.customers, prior),
     peak: {
       periods: periodRows,

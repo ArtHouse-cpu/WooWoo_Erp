@@ -108,6 +108,43 @@ const spaceSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    highlights: [
+      {
+        type: {
+          type: String,
+          enum: ['photo', 'video'],
+          default: 'photo',
+        },
+        url: {
+          type: String,
+          required: true,
+        },
+        title: {
+          type: String,
+          default: '',
+        },
+        category: {
+          type: String,
+          default: 'more',
+        },
+        duration: {
+          type: String,
+          default: '',
+        },
+        order: {
+          type: Number,
+          default: 0,
+        },
+      },
+    ],
+    highlightImages: {
+      type: [String],
+      default: [],
+    },
+    highlightVideos: {
+      type: [String],
+      default: [],
+    },
     createdBy: {
       m_staff_id: {type: String, default: null},
       m_staff_name: {type: String, default: null},

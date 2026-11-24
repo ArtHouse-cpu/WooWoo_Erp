@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
+  Banknote,
   Calendar,
   ChevronDown,
   Clock3,
+  CreditCard,
   Crown,
   FileText,
   Layers,
@@ -15,11 +17,13 @@ import {
   RotateCcw,
   Search,
   ShoppingBag,
+  Smartphone,
   Store,
   TrendingUp,
   User,
   Users,
   Utensils,
+  Wallet,
   X,
 } from "lucide-react";
 import {
@@ -47,6 +51,7 @@ import {
   type InsightsPayload,
   type RankedCustomer,
   type RankedItem,
+  type SegmentPayments,
   type VisitHistory,
   type VisitorRow,
 } from "@/features/purchase/insightsApi";
@@ -133,7 +138,7 @@ const InsightsAnalyticsScreen = () => {
 
   useEffect(() => {
     if (!data?.range?.from || !data.range.to) return;
-    if (segment !== "all" && segment !== "space") {
+    if (segment !== "space") {
       setSpaceUse(null);
       return;
     }
@@ -385,12 +390,12 @@ const InsightsAnalyticsScreen = () => {
               }
             />
           ) : null}
-          {data ? <PeriodKpis periods={data.peak.periods} /> : null}
+          {data ? <PeriodKpis periods={data.peak?.periods || []} /> : null}
         </div>
 
         {/* ================= MOBILE: TIME-BASED KPIS IN ALL 5 TABS ================= */}
         <div className="sm:hidden space-y-3">
-          {data ? <PeriodKpis periods={data.peak.periods} /> : null}
+          {data ? <PeriodKpis periods={data.peak?.periods || []} /> : null}
           {data ? (
             <SegmentCards
               segments={
@@ -403,7 +408,7 @@ const InsightsAnalyticsScreen = () => {
         </div>
 
         {/* ================= SPACE BOOKING UTILIZATION & DAY-WISE CHART ================= */}
-        {segment !== "food" && (segment === "all" || segment === "space") && (
+        {segment === "space" && (
           <SpaceUtilizationPanel data={spaceUse} />
         )}
 
@@ -424,10 +429,12 @@ const InsightsAnalyticsScreen = () => {
         {/* ================= REVENUE, TOP ITEMS, VISITORS, PEAK ================= */}
         {data ? (
           <>
+            {segment === "all" && <PeakSection data={data} segment={segment} />}
             <RevenueSection data={data} loading={loading} segment={segment} />
+            <PaymentsSection data={data} segment={segment} />
             <TopSection data={data} segment={segment} />
             <VisitorSection query={query} summary={data.visitors} />
-            <PeakSection data={data} />
+            {segment !== "all" && <PeakSection data={data} segment={segment} className="pb-6" />}
           </>
         ) : null}
       </div>
@@ -470,6 +477,48 @@ function ChipGroup<T extends string>({
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+const SECONDARY_SEGMENT_OPTIONS: { id: InsightSegment; label: string }[] = [
+  { id: "all", label: "Overall" },
+  { id: "food", label: "Food" },
+  { id: "space", label: "Space" },
+  { id: "store", label: "Store" },
+  { id: "membership", label: "Membership" },
+];
+
+function SecondarySegmentTabs({
+  value,
+  onChange,
+  className = "",
+}: {
+  value: InsightSegment;
+  onChange: (val: InsightSegment) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1 overflow-x-auto scrollbar-none rounded-xl bg-purple-50/80 p-1 border border-purple-100/90 ${className}`}
+    >
+      {SECONDARY_SEGMENT_OPTIONS.map((opt) => {
+        const active = value === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onChange(opt.id)}
+            className={`flex-1 min-w-[58px] rounded-lg px-2 py-1.5 text-center text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+              active
+                ? "bg-[#673DE6] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900 hover:bg-purple-100/60"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -641,6 +690,11 @@ function RevenueSection({
   loading: boolean;
   segment?: InsightSegment;
 }) {
+  const [activeSeg, setActiveSeg] = useState<InsightSegment>(segment);
+  useEffect(() => {
+    setActiveSeg(segment);
+  }, [segment]);
+
   const [mobileSlide, setMobileSlide] = useState(0);
   const mobileScrollRef = useRef<HTMLDivElement>(null);
 
@@ -663,7 +717,8 @@ function RevenueSection({
     setMobileSlide(idx);
   };
 
-  const currentSegment = segment === "all" ? null : data.segments.find(s => s.key === segment);
+  const effectiveSeg = segment === "all" ? activeSeg : segment;
+  const currentSegment = effectiveSeg === "all" ? null : data.segments.find(s => s.key === effectiveSeg);
 
   const totalRevenue = currentSegment ? currentSegment.revenue : data.totals.revenue;
   const growth = currentSegment ? currentSegment.changePct : data.totals.changePct;
@@ -676,34 +731,57 @@ function RevenueSection({
     : (data.totals.bills > 0 ? Math.round(data.totals.revenue / data.totals.bills) : 0);
 
   const itemsSold = currentSegment
-    ? (segment === "space"
+    ? (effectiveSeg === "space"
         ? (currentSegment.hours ? `${currentSegment.hours} hrs` : `${currentSegment.bookings} bookings`)
-        : segment === "membership"
+        : effectiveSeg === "membership"
         ? `${currentSegment.activeMembers ?? currentSegment.qty} members`
         : `${currentSegment.qty} sold`)
     : `${data.segments.reduce((sum, s) => sum + (s.qty || 0), 0)} sold`;
 
-  const filteredSegments =
-    segment === "all"
-      ? data.segments
-      : data.segments.filter(row => row.key === segment);
+  const isAll = effectiveSeg === "all";
+  const showMemberDonut = isAll || effectiveSeg === "membership";
 
-  const donut = filteredSegments
-    .filter(row => row.revenue > 0)
-    .map(row => ({
-      name: row.label,
-      value: row.revenue,
-      share: row.share,
-      color: SEGMENT_COLOR[row.key],
-    }));
-  const memberDonut = [
-    { name: "Membership", value: data.membership.memberRevenue, share: data.membership.memberShare, color: "#7c3aed" },
-    { name: "Non-membership", value: data.membership.otherRevenue, share: data.membership.otherShare, color: "#94a3b8" },
-  ].filter(row => row.value > 0);
+  // If "all", show all segments. If food/store/space/membership, show only that particular segment!
+  const targetSegments = isAll
+    ? data.segments
+    : data.segments.filter(s => s.key === effectiveSeg);
+
+  const segmentDonut: DonutRow[] = targetSegments.map(row => ({
+    key: row.key,
+    name: row.label,
+    value: row.revenue,
+    share: row.share,
+    growth: row.changePct,
+    previousRevenue: row.previousRevenue,
+    color: SEGMENT_COLOR[row.key] || "#6366f1",
+  }));
+
+  const memberDonut: DonutRow[] = [
+    {
+      key: "member",
+      name: "Membership",
+      value: data.membership.memberRevenue,
+      share: data.membership.memberShare,
+      color: "#7c3aed",
+    },
+    {
+      key: "nonmember",
+      name: "Non-membership",
+      value: data.membership.otherRevenue,
+      share: data.membership.otherShare,
+      color: "#94a3b8",
+    },
+  ];
 
   return (
     <section className="space-y-3">
       <SectionTitle title="Revenue Overview" note={loading ? "Updating…" : "Compared with previous period"} />
+
+      {segment === "all" && (
+        <div className="sm:hidden">
+          <SecondarySegmentTabs value={activeSeg} onChange={setActiveSeg} />
+        </div>
+      )}
 
       {/* ================= REVENUE & BILLS KPI CARDS ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
@@ -792,147 +870,315 @@ function RevenueSection({
         </article>
       </div>
 
-      {/* MOBILE VIEW ONLY: Both donuts unified inside ONE box, horizontally scrollable */}
+      {/* MOBILE VIEW */}
       <div className="block sm:hidden">
-        <article className="rounded-2xl border border-purple-100/90 bg-white p-3.5 shadow-xs">
-          {/* Header inside box with slide tabs & pagination dots */}
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-purple-100/70">
-            <div className="flex items-center gap-1 rounded-xl bg-purple-50/80 p-0.5 border border-purple-100/80">
-              <button
-                type="button"
-                onClick={() => scrollToSlide(0)}
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
-                  mobileSlide === 0
-                    ? "bg-[#673DE6] text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Segment
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToSlide(1)}
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
-                  mobileSlide === 1
-                    ? "bg-[#673DE6] text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Membership
-              </button>
+        {showMemberDonut ? (
+          <article className="rounded-2xl border border-purple-100/90 bg-white p-3.5 shadow-xs">
+            {/* Header inside box with slide tabs & pagination dots */}
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-purple-100/70">
+              <div className="flex items-center gap-1 rounded-xl bg-purple-50/80 p-0.5 border border-purple-100/80">
+                <button
+                  type="button"
+                  onClick={() => scrollToSlide(0)}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                    mobileSlide === 0
+                      ? "bg-[#673DE6] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Segment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToSlide(1)}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                    mobileSlide === 1
+                      ? "bg-[#673DE6] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Membership
+                </button>
+              </div>
+
+              {/* Pagination indicator dots */}
+              <div className="flex items-center gap-1.5 px-1">
+                <button
+                  type="button"
+                  onClick={() => scrollToSlide(0)}
+                  aria-label="View Segment Breakdown"
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                    mobileSlide === 0 ? "w-5 bg-[#673DE6]" : "w-2 bg-purple-200"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => scrollToSlide(1)}
+                  aria-label="View Membership Breakdown"
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                    mobileSlide === 1 ? "w-5 bg-[#673DE6]" : "w-2 bg-purple-200"
+                  }`}
+                />
+              </div>
             </div>
 
-            {/* Pagination indicator dots */}
-            <div className="flex items-center gap-1.5 px-1">
-              <button
-                type="button"
-                onClick={() => scrollToSlide(0)}
-                aria-label="View Segment Breakdown"
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                  mobileSlide === 0 ? "w-5 bg-[#673DE6]" : "w-2 bg-purple-200"
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => scrollToSlide(1)}
-                aria-label="View Membership Breakdown"
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                  mobileSlide === 1 ? "w-5 bg-[#673DE6]" : "w-2 bg-purple-200"
-                }`}
-              />
+            {/* Horizontally scrollable slides container */}
+            <div
+              ref={mobileScrollRef}
+              onScroll={handleMobileScroll}
+              className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none overscroll-x-contain"
+            >
+              <div className="w-full shrink-0 snap-start">
+                <DonutBlock
+                  title={isAll ? "By Business Segment" : `${currentSegment?.label || "Segment"} Breakdown`}
+                  center={inr(isAll ? data.totals.revenue : (currentSegment?.revenue || 0))}
+                  centerGrowth={isAll ? data.totals.changePct : (currentSegment?.changePct ?? null)}
+                  centerLabel={isAll ? "Total Sales" : `${currentSegment?.label || "Segment"}`}
+                  rows={segmentDonut}
+                  empty="No billed sales in this range."
+                  activeKey={isAll ? undefined : effectiveSeg}
+                  onSelectKey={isAll && segment === "all" ? (k => setActiveSeg(k as InsightSegment)) : undefined}
+                />
+              </div>
+              <div className="w-full shrink-0 snap-start">
+                <DonutBlock
+                  title="Membership vs Non-membership"
+                  center={inr(data.totals.revenue)}
+                  centerGrowth={data.totals.changePct}
+                  centerLabel="Total Sales"
+                  rows={memberDonut}
+                  empty="No billed sales in this range."
+                />
+              </div>
             </div>
-          </div>
-
-          {/* Horizontally scrollable slides container */}
-          <div
-            ref={mobileScrollRef}
-            onScroll={handleMobileScroll}
-            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none overscroll-x-contain"
-          >
-            <div className="w-full shrink-0 snap-start">
-              <DonutBlock
-                title="By Business Segment"
-                center={inr(data.totals.revenue)}
-                rows={donut}
-                empty="No billed sales in this range."
-              />
-            </div>
-            <div className="w-full shrink-0 snap-start">
-              <DonutBlock
-                title="Membership vs Non-membership"
-                center={inr(data.totals.revenue)}
-                rows={memberDonut}
-                empty="No billed sales in this range."
-              />
-            </div>
-          </div>
-        </article>
+          </article>
+        ) : (
+          <article className="rounded-2xl border border-purple-100/90 bg-white p-3.5 shadow-xs">
+            <DonutBlock
+              title={`${currentSegment?.label || "Segment"} Breakdown`}
+              center={inr(currentSegment?.revenue || 0)}
+              centerGrowth={currentSegment?.changePct ?? null}
+              centerLabel={`${currentSegment?.label || "Segment"}`}
+              rows={segmentDonut}
+              empty="No billed sales in this range."
+            />
+          </article>
+        )}
       </div>
 
-      {/* WEB VIEW (UNTOUCHED): 2 separate side-by-side boxes */}
-      <div className="hidden sm:grid sm:grid-cols-2 gap-2.5 sm:gap-3">
+      {/* WEB VIEW */}
+      <div className={`hidden sm:grid ${showMemberDonut ? "sm:grid-cols-2" : "sm:grid-cols-1"} gap-2.5 sm:gap-3`}>
         <DonutCard
-          title="By Business Segment"
-          center={inr(data.totals.revenue)}
-          rows={donut}
+          title={isAll ? "By Business Segment" : `${currentSegment?.label || "Segment"} Breakdown`}
+          center={inr(isAll ? data.totals.revenue : (currentSegment?.revenue || 0))}
+          centerGrowth={isAll ? data.totals.changePct : (currentSegment?.changePct ?? null)}
+          centerLabel={isAll ? "Total Sales" : `${currentSegment?.label || "Segment"}`}
+          rows={segmentDonut}
           empty="No billed sales in this range."
-          theme="amber"
+          theme={effectiveSeg === "food" ? "amber" : effectiveSeg === "space" ? "purple" : "amber"}
+          activeKey={isAll ? undefined : effectiveSeg}
+          onSelectKey={isAll && segment === "all" ? (k => setActiveSeg(k as InsightSegment)) : undefined}
         />
-        <DonutCard
-          title="Membership vs Non-membership"
-          center={inr(data.totals.revenue)}
-          rows={memberDonut}
-          empty="No billed sales in this range."
-          theme="purple"
-        />
+        {showMemberDonut && (
+          <DonutCard
+            title="Membership vs Non-membership"
+            center={inr(data.totals.revenue)}
+            centerGrowth={data.totals.changePct}
+            centerLabel="Total Sales"
+            rows={memberDonut}
+            empty="No billed sales in this range."
+            theme="purple"
+          />
+        )}
       </div>
     </section>
   );
 }
 
+type DonutRow = {
+  key?: string;
+  name: string;
+  value: number;
+  share: number;
+  growth?: number | null;
+  previousRevenue?: number;
+  color: string;
+};
+
 function DonutBlock({
   title,
   center,
+  centerGrowth,
+  centerLabel = "Total Sales",
   rows,
   empty,
+  activeKey,
+  onSelectKey,
 }: {
   title: string;
   center: string;
-  rows: { name: string; value: number; share: number; color: string }[];
+  centerGrowth?: number | null;
+  centerLabel?: string;
+  rows: DonutRow[];
   empty: string;
+  activeKey?: string;
+  onSelectKey?: (key: string) => void;
 }) {
+  const pieData = rows.filter(row => row.value > 0);
+  const totalValue = rows.reduce((sum, r) => sum + (r.value || 0), 0);
+
   return (
     <div>
-      <h3 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h3>
-      {rows.length === 0 ? (
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h3>
+        {centerGrowth !== undefined && (
+          <span
+            className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+              centerGrowth == null
+                ? "bg-purple-50 text-purple-700 border-purple-200"
+                : centerGrowth >= 0
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : "bg-rose-50 text-rose-700 border-rose-200"
+            }`}
+          >
+            Growth: {centerGrowth != null ? `${centerGrowth >= 0 ? "+" : ""}${centerGrowth}%` : "New"}
+          </span>
+        )}
+      </div>
+
+      {rows.length === 0 || totalValue === 0 ? (
         <p className="py-8 sm:py-16 text-center text-xs sm:text-sm text-slate-400">{empty}</p>
       ) : (
-        <div className="mt-2 grid items-center gap-2 sm:grid-cols-[200px_1fr] md:grid-cols-[220px_1fr]">
-          <div className="relative h-44 sm:h-52">
+        <div className="mt-2 grid items-center gap-3 sm:grid-cols-[180px_1fr] md:grid-cols-[190px_1fr]">
+          <div className="relative h-44 sm:h-48 mx-auto w-44 sm:w-48 shrink-0 flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={rows} dataKey="value" nameKey="name" innerRadius={52} outerRadius={72} paddingAngle={2} stroke="none">
-                  {rows.map(row => <Cell key={row.name} fill={row.color} />)}
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={48}
+                  outerRadius={68}
+                  paddingAngle={pieData.length > 1 ? 3 : 0}
+                  stroke="none"
+                >
+                  {pieData.map(row => (
+                    <Cell key={row.name} fill={row.color} />
+                  ))}
                 </Pie>
-                <Tooltip formatter={(value, _name, item) => [inr(Number(value) || 0), `${item?.payload?.share ?? 0}%`]} />
+                <Tooltip
+                  formatter={(value, name, item) => {
+                    const p = item?.payload as DonutRow;
+                    const g =
+                      p?.growth !== undefined
+                        ? p.growth != null
+                          ? ` · ${p.growth >= 0 ? "+" : ""}${p.growth}% growth`
+                          : " · New"
+                        : "";
+                    return [
+                      `${inr(Number(value) || 0)} (${p?.share ?? 0}% of sale)${g}`,
+                      name,
+                    ];
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-slate-400">Net Sales</span>
-              <span className="text-xs sm:text-sm font-black text-slate-900">{center}</span>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center p-1">
+              <span className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
+                {centerLabel}
+              </span>
+              <span className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
+                {center}
+              </span>
+              {centerGrowth !== undefined && (
+                <span
+                  className={`mt-0.5 inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-extrabold ${
+                    centerGrowth == null
+                      ? "text-purple-700 bg-purple-50"
+                      : centerGrowth >= 0
+                      ? "text-emerald-700 bg-emerald-50"
+                      : "text-rose-700 bg-rose-50"
+                  }`}
+                >
+                  {centerGrowth != null ? `${centerGrowth >= 0 ? "+" : ""}${centerGrowth}%` : "New"}
+                </span>
+              )}
             </div>
           </div>
-          <ul className="space-y-1.5 sm:space-y-2">
-            {rows.map(row => (
-              <li key={row.name} className="flex items-center justify-between gap-2 sm:gap-3 text-[11px] sm:text-xs">
-                <span className="flex items-center gap-1.5 sm:gap-2 text-slate-600 truncate">
-                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: row.color }} />
-                  <span className="truncate font-medium">{row.name}</span>
-                </span>
-                <span className="font-bold text-slate-900 shrink-0">{inr(row.value)} · {row.share}%</span>
-              </li>
-            ))}
-          </ul>
+
+          <div className="min-w-0">
+            {/* Header: Segment | Total | Growth | % of Sale */}
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 pb-1.5 border-b border-slate-100/90 mb-1">
+              <span>Segment</span>
+              <div className="flex items-center gap-2 sm:gap-3 text-right">
+                <span className="w-16 sm:w-20 text-right">Total</span>
+                <span className="w-12 sm:w-14 text-center">Growth</span>
+                <span className="w-14 sm:w-16 text-right">% of Sale</span>
+              </div>
+            </div>
+
+            {/* Rows list */}
+            <ul className="space-y-1">
+              {rows.map(row => {
+                const isSelected = Boolean(activeKey && row.key && activeKey === row.key);
+                return (
+                  <li
+                    key={row.name}
+                    onClick={() => row.key && onSelectKey?.(row.key)}
+                    className={`flex items-center justify-between gap-1 rounded-xl px-2 py-1.5 transition text-xs ${
+                      isSelected
+                        ? "bg-purple-100/70 border border-purple-200 ring-1 ring-purple-300"
+                        : onSelectKey && row.key
+                        ? "hover:bg-slate-50 cursor-pointer"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        style={{ background: row.color }}
+                      />
+                      <span className="truncate font-bold text-slate-800 text-[11px] sm:text-xs">
+                        {row.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                      {/* Total */}
+                      <span className="w-16 sm:w-20 text-right font-black text-slate-900 text-[11px] sm:text-xs">
+                        {inr(row.value)}
+                      </span>
+
+                      {/* Growth */}
+                      <div className="w-12 sm:w-14 flex justify-center">
+                        {row.growth !== undefined ? (
+                          <span
+                            className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[9.5px] sm:text-[10px] font-extrabold border ${
+                              row.growth == null
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : row.growth >= 0
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}
+                            title={row.previousRevenue ? `Previous: ${inr(row.previousRevenue)}` : undefined}
+                          >
+                            {row.growth != null ? `${row.growth >= 0 ? "+" : ""}${row.growth}%` : "New"}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-[10px]">—</span>
+                        )}
+                      </div>
+
+                      {/* % of Sale */}
+                      <span className="w-14 sm:w-16 text-right font-bold text-slate-700 text-[11px] sm:text-xs">
+                        {row.share}%
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
       )}
     </div>
@@ -942,15 +1188,23 @@ function DonutBlock({
 function DonutCard({
   title,
   center,
+  centerGrowth,
+  centerLabel,
   rows,
   empty,
   theme = "purple",
+  activeKey,
+  onSelectKey,
 }: {
   title: string;
   center: string;
-  rows: { name: string; value: number; share: number; color: string }[];
+  centerGrowth?: number | null;
+  centerLabel?: string;
+  rows: DonutRow[];
   empty: string;
   theme?: "amber" | "purple";
+  activeKey?: string;
+  onSelectKey?: (key: string) => void;
 }) {
   const cardBorder = theme === "amber"
     ? "border-amber-100/90 bg-gradient-to-br from-amber-50/20 via-white to-purple-50/20"
@@ -958,7 +1212,16 @@ function DonutCard({
 
   return (
     <article className={`rounded-2xl border ${cardBorder} p-3.5 sm:p-4 shadow-xs`}>
-      <DonutBlock title={title} center={center} rows={rows} empty={empty} />
+      <DonutBlock
+        title={title}
+        center={center}
+        centerGrowth={centerGrowth}
+        centerLabel={centerLabel}
+        rows={rows}
+        empty={empty}
+        activeKey={activeKey}
+        onSelectKey={onSelectKey}
+      />
     </article>
   );
 }
@@ -975,6 +1238,298 @@ function Trend({ value }: { value: number | null }) {
   );
 }
 
+const PAYMENT_CONFIG: Record<
+  string,
+  {
+    label: string;
+    color: string;
+    badgeBg: string;
+    border: string;
+    icon: typeof Banknote;
+  }
+> = {
+  cash: {
+    label: "Cash",
+    color: "#10B981",
+    badgeBg: "bg-emerald-50 border-emerald-200 text-emerald-700",
+    border: "border-emerald-100/90 hover:border-emerald-300",
+    icon: Banknote,
+  },
+  upi: {
+    label: "UPI",
+    color: "#8B5CF6",
+    badgeBg: "bg-purple-50 border-purple-200 text-[#673DE6]",
+    border: "border-purple-100/90 hover:border-purple-300",
+    icon: Smartphone,
+  },
+  wallet: {
+    label: "Wallet",
+    color: "#0284C7",
+    badgeBg: "bg-sky-50 border-sky-200 text-sky-700",
+    border: "border-sky-100/90 hover:border-sky-300",
+    icon: Wallet,
+  },
+  card: {
+    label: "Card / Other",
+    color: "#F59E0B",
+    badgeBg: "bg-amber-50 border-amber-200 text-amber-700",
+    border: "border-amber-100/90 hover:border-amber-300",
+    icon: CreditCard,
+  },
+};
+
+function PaymentsSection({
+  data,
+  segment = "all",
+}: {
+  data: InsightsPayload;
+  segment?: InsightSegment;
+}) {
+  const [activeSeg, setActiveSeg] = useState<InsightSegment>(segment);
+  useEffect(() => {
+    setActiveSeg(segment);
+  }, [segment]);
+
+  const effectiveSeg = segment === "all" ? activeSeg : segment;
+
+  const segmentPayments = useMemo<SegmentPayments>(() => {
+    if (data.payments && data.payments[effectiveSeg]) {
+      return data.payments[effectiveSeg];
+    }
+    const fromSeg = data.segments?.find((s) => s.key === effectiveSeg)?.payments;
+    if (fromSeg) return fromSeg;
+    return data.payments?.all || { total: 0, bills: 0, methods: [] };
+  }, [data, effectiveSeg]);
+
+  const segmentLabels: Record<string, string> = {
+    all: "Overall",
+    food: "Food & Beverages",
+    space: "Coworking & Event Space",
+    store: "Store & Retail",
+    membership: "Membership",
+  };
+  const currentSegLabel = segmentLabels[effectiveSeg] || "Overall";
+
+  const pieData = useMemo(() => {
+    return (segmentPayments.methods || [])
+      .filter((m) => m.amount > 0)
+      .map((m) => {
+        const cfg = PAYMENT_CONFIG[m.method] || {
+          label: m.label || m.method,
+          color: "#64748B",
+        };
+        return {
+          name: cfg.label,
+          method: m.method,
+          value: m.amount,
+          share: m.percentage,
+          bills: m.bills,
+          color: cfg.color,
+        };
+      });
+  }, [segmentPayments]);
+
+  const hasData = segmentPayments.total > 0 || pieData.length > 0;
+  const methods = segmentPayments.methods || [];
+
+  return (
+    <section className="space-y-3">
+      {/* Section Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-100 text-[#673DE6]">
+            <Wallet className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs sm:text-sm font-bold text-slate-900">
+                Payment Modes Breakdown
+              </h2>
+              <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-[#673DE6] border border-purple-200">
+                {currentSegLabel}
+              </span>
+            </div>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium">
+              Revenue distribution across Cash, UPI &amp; Wallet for {currentSegLabel}
+            </p>
+          </div>
+        </div>
+
+        {hasData && (
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs">
+            <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700 border border-emerald-200">
+              Total: {inr(segmentPayments.total)}
+            </span>
+            <span className="rounded-lg bg-purple-50 px-2.5 py-1 font-bold text-[#673DE6] border border-purple-200">
+              {segmentPayments.bills} {segmentPayments.bills === 1 ? "Bill" : "Bills"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {segment === "all" && (
+        <div className="sm:hidden">
+          <SecondarySegmentTabs value={activeSeg} onChange={setActiveSeg} />
+        </div>
+      )}
+
+      {!hasData ? (
+        <div className="rounded-2xl border border-purple-100/90 bg-white p-8 text-center text-xs sm:text-sm font-medium text-slate-400 shadow-xs">
+          No payment transactions recorded for {currentSegLabel} in this date range.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+          {/* Donut / Pie Chart Block */}
+          <article className="lg:col-span-5 rounded-2xl border border-purple-100/90 bg-gradient-to-br from-purple-50/20 via-white to-indigo-50/20 p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                Payment Share (%)
+              </h3>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
+                {segmentPayments.bills} bills total
+              </span>
+            </div>
+
+            {/* Flex container: Pie chart on Left, Pointers on Right */}
+            <div className="flex items-center justify-between gap-2.5 sm:gap-4 my-auto py-1">
+              {/* Left: Small Donut Chart */}
+              <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={34}
+                      outerRadius={50}
+                      paddingAngle={3}
+                      stroke="none"
+                    >
+                      {pieData.map((row) => (
+                        <Cell key={row.name} fill={row.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(val, _name, item) => [
+                        `${inr(Number(val) || 0)} (${item?.payload?.share ?? 0}%)`,
+                        `${item?.payload?.bills ?? 0} bills`,
+                      ]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-1">
+                  <span className="text-[7.5px] font-bold uppercase tracking-wider text-slate-400 leading-tight">
+                    Paid
+                  </span>
+                  <span className="text-[11px] sm:text-xs font-black text-slate-900 leading-tight">
+                    {inr(segmentPayments.total)}
+                  </span>
+                  <span className="text-[8.5px] text-slate-400 font-medium leading-tight">
+                    {segmentPayments.bills} bills
+                  </span>
+                </div>
+              </div>
+
+              {/* Right: Pointers / Legend list */}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {pieData.map((p) => (
+                  <div
+                    key={p.name}
+                    className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/90 border border-purple-100/70 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ background: p.color }}
+                      />
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">
+                        {p.name}
+                      </span>
+                    </div>
+                    <span className="text-xs sm:text-[13px] font-black text-slate-900 shrink-0">
+                      {p.share}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </article>
+
+          {/* Cards Breakdown: Horizontally Scrollable on Mobile with parallel percentage line */}
+          <div className="lg:col-span-7 flex overflow-x-auto gap-2.5 sm:gap-3 pb-2 pt-0.5 scrollbar-none snap-x snap-mandatory overscroll-x-contain">
+            {methods.map((method) => {
+              const cfg = PAYMENT_CONFIG[method.method] || {
+                label: method.label || method.method,
+                color: "#64748B",
+                badgeBg: "bg-slate-50 border-slate-200 text-slate-700",
+                border: "border-slate-100 hover:border-slate-300",
+                icon: Banknote,
+              };
+              const Icon = cfg.icon;
+
+              return (
+                <article
+                  key={method.method}
+                  className={`w-[78vw] max-w-[280px] sm:w-[250px] lg:min-w-[210px] lg:flex-1 shrink-0 snap-start rounded-2xl border ${cfg.border} bg-white p-3 sm:p-3.5 shadow-[0_2px_8px_rgba(103,61,230,0.04)] transition hover:shadow-md flex flex-col justify-between`}
+                >
+                  {/* Header: Icon, Name, Share badge */}
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-white shrink-0 shadow-xs"
+                        style={{ backgroundColor: cfg.color }}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                        {cfg.label}
+                      </span>
+                    </div>
+                    <span
+                      className={`rounded-md border px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold shrink-0 ${cfg.badgeBg}`}
+                    >
+                      {method.percentage}%
+                    </span>
+                  </div>
+
+                  {/* Parallel: Rupees on Left & Percentage Line on Right */}
+                  <div className="mt-2 flex items-center justify-between gap-2.5 pt-1">
+                    <div className="min-w-0">
+                      <p className="text-base sm:text-lg font-black text-slate-900 leading-tight truncate">
+                        {inr(method.amount)}
+                      </p>
+                      <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 mt-0.5 truncate">
+                        {method.bills} {method.bills === 1 ? "bill" : "bills"}
+                      </p>
+                    </div>
+
+                    {/* Percentage line parallel to rupees */}
+                    <div className="w-24 sm:w-28 shrink-0 flex flex-col justify-center">
+                      <div className="flex justify-between items-center text-[9px] font-bold text-slate-500 mb-1">
+                        <span className="text-[9px] text-slate-400 font-semibold">Share</span>
+                        <span className="text-slate-800">{method.percentage}%</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, method.percentage))}%`,
+                            backgroundColor: cfg.color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TopSection({
   data,
   segment = "all",
@@ -982,6 +1537,13 @@ function TopSection({
   data: InsightsPayload;
   segment?: InsightSegment;
 }) {
+  const [activeSeg, setActiveSeg] = useState<InsightSegment>(segment);
+  useEffect(() => {
+    setActiveSeg(segment);
+  }, [segment]);
+
+  const effectiveSeg = segment === "all" ? activeSeg : segment;
+
   const [viewType, setViewType] = useState<"customers" | "items">("customers");
   const [limit, setLimit] = useState<5 | 10>(5);
   const [sort, setSort] = useState<"revenue" | "qty">("revenue");
@@ -1072,11 +1634,11 @@ function TopSection({
 
   const columns = useMemo(() => {
     const list = viewType === "customers" ? allCustomerColumns : allItemColumns;
-    if (segment === "all") {
+    if (effectiveSeg === "all") {
       return list.filter((c) => c.key !== "membership");
     }
-    return list.filter((c) => c.key === segment);
-  }, [segment, viewType]);
+    return list.filter((c) => c.key === effectiveSeg);
+  }, [effectiveSeg, viewType]);
 
   const isSingle = columns.length === 1;
 
@@ -1096,10 +1658,10 @@ function TopSection({
               ["items", "Items"],
             ]}
           />
-          {viewType === "items" && segment !== "membership" && (
+          {viewType === "items" && effectiveSeg !== "membership" && (
             <ChipGroup value={sort} onChange={setSort} options={[["revenue", "Revenue"], ["qty", "Quantity"]]} />
           )}
-          {(viewType === "customers" || segment !== "membership") && (
+          {(viewType === "customers" || effectiveSeg !== "membership") && (
             <ChipGroup
               value={String(limit) as "5" | "10"}
               onChange={value => setLimit(value === "10" ? 10 : 5)}
@@ -1108,6 +1670,12 @@ function TopSection({
           )}
         </div>
       </div>
+
+      {segment === "all" && (
+        <div className="sm:hidden">
+          <SecondarySegmentTabs value={activeSeg} onChange={setActiveSeg} />
+        </div>
+      )}
       <div
         className={
           isSingle
@@ -1149,8 +1717,8 @@ function TopSection({
 
           const rawRows: RankedItem[] =
             column.key === "membership"
-              ? data.segments.find(s => s.key === "membership")?.top || []
-              : data.top[column.key] || [];
+              ? data?.segments?.find(s => s.key === "membership")?.top || []
+              : data?.top?.[column.key] || [];
 
           const rows = [...rawRows]
             .sort((a, b) => (sort === "qty" ? b.qty - a.qty : b.revenue - a.revenue))
@@ -1298,6 +1866,11 @@ function VisitorSection({
   query: InsightQuery;
   summary: InsightsPayload["visitors"];
 }) {
+  const [activeSeg, setActiveSeg] = useState<InsightSegment>(query.segment || "all");
+  useEffect(() => {
+    setActiveSeg(query.segment || "all");
+  }, [query.segment]);
+
   const [bucket, setBucket] = useState<"day" | "week" | "month">("day");
   const [visits, setVisits] = useState<"all" | "1" | "2" | "3">("all");
   const [page, setPage] = useState(1);
@@ -1315,12 +1888,12 @@ function VisitorSection({
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [query, bucket, visits, debounced]);
+  useEffect(() => { setPage(1); }, [query, activeSeg, bucket, visits, debounced]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetchVisitors({ ...query, bucket, visits, page, search: debounced })
+    fetchVisitors({ ...query, segment: activeSeg, bucket, visits, page, search: debounced })
       .then(payload => {
         if (!active) return;
         setRows(payload.rows || []);
@@ -1336,7 +1909,7 @@ function VisitorSection({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [query, bucket, visits, page, debounced]);
+  }, [query, activeSeg, bucket, visits, page, debounced]);
 
   const donut = [
     { name: "First time", value: summary.firstTime, color: "#0284c7" },
@@ -1359,6 +1932,12 @@ function VisitorSection({
             </p>
           </div>
         </div>
+
+        {(query.segment || "all") === "all" && (
+          <div className="mb-4 sm:hidden">
+            <SecondarySegmentTabs value={activeSeg} onChange={setActiveSeg} />
+          </div>
+        )}
 
         {/* Content Grid: 1 Column on Mobile (KPIs row then Donut), 2 Columns on Desktop */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-stretch">
@@ -1727,11 +2306,77 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PeakSection({ data }: { data: InsightsPayload }) {
+function PeakSection({
+  data,
+  segment = "all",
+  className = "",
+}: {
+  data: InsightsPayload;
+  segment?: InsightSegment;
+  className?: string;
+}) {
+  const [activeSeg, setActiveSeg] = useState<InsightSegment>(segment);
+  useEffect(() => {
+    setActiveSeg(segment);
+  }, [segment]);
+
   const [metric, setMetric] = useState<"bills" | "revenue">("bills");
-  const highlight = metric === "bills" ? data.peak.busiestPeriod : data.peak.highestRevenuePeriod;
+
+  const effectiveSeg = segment === "all" ? activeSeg : segment;
+  const selectedSeg = effectiveSeg === "all" ? null : data?.segments?.find((s) => s.key === effectiveSeg);
+
+  const totalRev = Number(data?.totals?.revenue || 0);
+  const totalBillsCount = Number(data?.totals?.bills || 0);
+
+  const displayPeriods = useMemo(() => {
+    if (!selectedSeg || totalRev <= 0) return data?.peak?.periods || [];
+    const revRatio = totalRev > 0 ? (selectedSeg.revenue || 0) / totalRev : 0;
+    const billRatio = totalBillsCount > 0 ? (selectedSeg.bills || 0) / totalBillsCount : revRatio;
+    return (data?.peak?.periods || []).map((p) => ({
+      ...p,
+      revenue: Math.round((p.revenue || 0) * revRatio),
+      bills: Math.max(0, Math.round((p.bills || 0) * billRatio)),
+    }));
+  }, [data, selectedSeg, totalRev, totalBillsCount]);
+
+  const displayWeekdays = useMemo(() => {
+    if (!selectedSeg || totalRev <= 0) return data?.peak?.weekdays || [];
+    const revRatio = totalRev > 0 ? (selectedSeg.revenue || 0) / totalRev : 0;
+    const billRatio = totalBillsCount > 0 ? (selectedSeg.bills || 0) / totalBillsCount : revRatio;
+    return (data?.peak?.weekdays || []).map((w) => ({
+      ...w,
+      revenue: Math.round((w.revenue || 0) * revRatio),
+      bills: Math.max(0, Math.round((w.bills || 0) * billRatio)),
+    }));
+  }, [data, selectedSeg, totalRev, totalBillsCount]);
+
+  const busiestPeriod = useMemo(() => {
+    if (!displayPeriods.length) return data?.peak?.busiestPeriod || "—";
+    const sorted = [...displayPeriods].sort((a, b) => b.bills - a.bills);
+    return sorted[0]?.label || data?.peak?.busiestPeriod || "—";
+  }, [displayPeriods, data?.peak?.busiestPeriod]);
+
+  const highestRevenuePeriod = useMemo(() => {
+    if (!displayPeriods.length) return data?.peak?.highestRevenuePeriod || "—";
+    const sorted = [...displayPeriods].sort((a, b) => b.revenue - a.revenue);
+    return sorted[0]?.label || data?.peak?.highestRevenuePeriod || "—";
+  }, [displayPeriods, data?.peak?.highestRevenuePeriod]);
+
+  const totalBills = selectedSeg ? (selectedSeg.bills || 0) : (data?.peak?.totalBills ?? 0);
+  const avgBills = selectedSeg
+    ? Math.round(((selectedSeg.bills || 0) / Math.max(1, displayWeekdays.length)) * 10) / 10
+    : (data?.peak?.averageBillsPerDay ?? 0);
+
+  const busiestDay = useMemo(() => {
+    if (!displayWeekdays.length) return data?.peak?.busiestDay || "—";
+    const sorted = [...displayWeekdays].sort((a, b) => b.bills - a.bills);
+    return sorted[0]?.day || data?.peak?.busiestDay || "—";
+  }, [displayWeekdays, data?.peak?.busiestDay]);
+
+  const highlight = metric === "bills" ? busiestPeriod : highestRevenuePeriod;
+
   return (
-    <section className="space-y-3 pb-6">
+    <section className={`space-y-3 ${className}`}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <SectionTitle title="Peak Billing Hours" note="Time is taken from when bill was saved" />
         <ChipGroup
@@ -1745,38 +2390,45 @@ function PeakSection({ data }: { data: InsightsPayload }) {
           ]}
         />
       </div>
+
+      {segment === "all" && (
+        <div className="sm:hidden">
+          <SecondarySegmentTabs value={activeSeg} onChange={setActiveSeg} />
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-        <Mini icon={<Clock3 size={15} />} label="Most active" value={data.peak.busiestPeriod || "—"} theme="amber" />
-        <Mini icon={<Store size={15} />} label="Highest revenue" value={data.peak.highestRevenuePeriod || "—"} theme="emerald" />
-        <Mini icon={<Users size={15} />} label="Total bills" value={String(data.peak.totalBills)} theme="indigo" />
-        <Mini icon={<Clock3 size={15} />} label="Average bills / day" value={String(data.peak.averageBillsPerDay)} theme="rose" />
+        <Mini icon={<Clock3 size={15} />} label="Most active" value={busiestPeriod || "—"} theme="amber" />
+        <Mini icon={<Store size={15} />} label="Highest revenue" value={highestRevenuePeriod || "—"} theme="emerald" />
+        <Mini icon={<Users size={15} />} label="Total bills" value={String(totalBills)} theme="indigo" />
+        <Mini icon={<Clock3 size={15} />} label="Average bills / day" value={String(avgBills)} theme="rose" />
       </div>
       <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-2">
         <ChartCard title="Time of Day">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.peak.periods} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+            <BarChart data={displayPeriods} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} />
               <YAxis tick={{ fontSize: 10, fill: "#64748b" }} width={28} allowDecimals={false} />
               <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
               <Bar dataKey={metric} radius={[5, 5, 0, 0]}>
-                {data.peak.periods.map(row => (
+                {displayPeriods.map(row => (
                   <Cell key={row.key} fill={row.label === highlight ? "#673DE6" : "#DDD6FE"} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title={`Weekday · Busiest ${data.peak.busiestDay || "—"}`}>
+        <ChartCard title={`Weekday · Busiest ${busiestDay || "—"}`}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.peak.weekdays} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+            <BarChart data={displayWeekdays} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} />
               <YAxis tick={{ fontSize: 10, fill: "#64748b" }} width={28} allowDecimals={false} />
               <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
               <Bar dataKey={metric} radius={[5, 5, 0, 0]}>
-                {data.peak.weekdays.map(row => (
-                  <Cell key={row.day} fill={row.day === data.peak.busiestDay ? "#059669" : "#A7F3D0"} />
+                {displayWeekdays.map(row => (
+                  <Cell key={row.day} fill={row.day === busiestDay ? "#059669" : "#A7F3D0"} />
                 ))}
               </Bar>
             </BarChart>

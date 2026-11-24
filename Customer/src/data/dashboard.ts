@@ -9,10 +9,8 @@ import {
   Home,
   MapPin,
   MessageCircle,
-  Settings,
   ShoppingBag,
   Star,
-  User,
   Users,
   Wallet,
   Wrench,
@@ -44,9 +42,6 @@ export const dashboardNav: NavItem[] = [
   {id: 'programs', label: 'Programs', icon: Sparkles, to: '/ourprograms', section: 'Main'},
   {id: 'membership', label: 'Membership', icon: Crown, to: '/membership', section: 'Main'},
   {id: 'wallet', label: 'Wallet', icon: Wallet, to: '/wallet', section: 'Main'},
-
-  {id: 'profile', label: 'Profile', icon: User, to: '/profile', section: 'Account'},
-  {id: 'settings', label: 'Settings', icon: Settings, to: '/settings', section: 'Account'},
 ];
 
 export const exploreItems = [

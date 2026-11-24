@@ -12,13 +12,14 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Sparkles,
   Tag,
   Users,
   Video,
   X,
 } from "lucide-react";
 import Swal from "sweetalert2";
-import type { SpacePayload } from "@/services/apiClient";
+import type { SpacePayload, SpaceHighlightItem } from "@/services/apiClient";
 import { uploadSpaceVideos } from "@/services/apiClient";
 import { closeIfConfirmed } from "@/utils/confirmClose";
 
@@ -26,6 +27,24 @@ export type SpaceDay = "Weekday" | "Weekend";
 export type SpaceStatus = "Available" | "Booked" | "Maintenance";
 export type DayOption = "Weekday" | "Weekend" | "Both";
 export type SpaceType = "Exclusive" | "Coworking";
+
+export type SpaceHighlightState = {
+  id: string;
+  type: "photo" | "video";
+  url: string;
+  file?: File;
+  title?: string;
+  category?: string;
+  duration?: string;
+};
+
+export const HIGHLIGHT_CATEGORIES = [
+  { value: "parties", label: "Parties" },
+  { value: "shows", label: "Shows" },
+  { value: "meetings", label: "Meetings" },
+  { value: "workshops", label: "Workshops" },
+  { value: "more", label: "More" },
+] as const;
 
 export type SpaceFormPayload = {
   name: string;
@@ -45,6 +64,9 @@ export type SpaceFormPayload = {
   day?: SpaceDay;
   price?: number;
   status?: SpaceStatus;
+  highlights?: SpaceHighlightItem[];
+  highlightImages?: string[];
+  highlightVideos?: string[];
 };
 
 export type SpaceMediaSelection = {
@@ -54,6 +76,11 @@ export type SpaceMediaSelection = {
   existingVideos: string[];
   videoFile: File | null;
   removeVideo: boolean;
+  highlightImageFiles?: File[];
+  existingHighlightImages?: string[];
+  highlightVideoFiles?: File[];
+  existingHighlightVideos?: string[];
+  highlights?: SpaceHighlightItem[];
 };
 
 type SpaceImageItem = {
@@ -145,6 +172,12 @@ export default function AddSpaceModal({
   const [videoDrag, setVideoDrag] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
 
+  // Highlights state
+  const [highlights, setHighlights] = useState<SpaceHighlightState[]>([]);
+  const [highlightDrag, setHighlightDrag] = useState(false);
+  const [highlightCategory, setHighlightCategory] = useState<string>("parties");
+  const [highlightDurations, setHighlightDurations] = useState<Record<string, string>>({});
+
   // Day selection mode: "Weekday" | "Weekend" | "Both"
   const [dayMode, setDayMode] = useState<DayOption>("Weekday");
 
@@ -228,6 +261,48 @@ export default function AddSpaceModal({
             : [];
       setVideos(savedVideos.filter(Boolean).map((url) => ({ id: url, url })));
 
+      const initialHighlights: SpaceHighlightState[] = [];
+      if (Array.isArray(initialSpace.highlights) && initialSpace.highlights.length > 0) {
+        initialSpace.highlights.forEach((h, idx) => {
+          if (h && h.url) {
+            initialHighlights.push({
+              id: h.id || `hl-${idx}-${h.url}`,
+              type: h.type === "video" ? "video" : "photo",
+              url: h.url,
+              title: h.title || "",
+              category: h.category || "parties",
+              duration: h.duration || "",
+            });
+          }
+        });
+      } else {
+        if (Array.isArray(initialSpace.highlightImages)) {
+          initialSpace.highlightImages.forEach((url, idx) => {
+            if (url) {
+              initialHighlights.push({
+                id: `hl-img-${idx}`,
+                type: "photo",
+                url,
+                category: "parties",
+              });
+            }
+          });
+        }
+        if (Array.isArray(initialSpace.highlightVideos)) {
+          initialSpace.highlightVideos.forEach((url, idx) => {
+            if (url) {
+              initialHighlights.push({
+                id: `hl-vid-${idx}`,
+                type: "video",
+                url,
+                category: "shows",
+              });
+            }
+          });
+        }
+      }
+      setHighlights(initialHighlights);
+
       const paired = initialSpace as SpacePayload & {
         weekday?: SpacePayload;
         weekend?: SpacePayload;
@@ -264,6 +339,7 @@ export default function AddSpaceModal({
       setDescription("");
       setImages([]);
       setVideos([]);
+      setHighlights([]);
 
       setDayMode("Both");
       setPrice(0);
@@ -310,11 +386,39 @@ export default function AddSpaceModal({
     }
   };
 
-  const mediaSelection = (source = videos): SpaceMediaSelection => {
+  const mediaSelection = (
+    source = videos,
+    readyHighlights = highlights,
+  ): SpaceMediaSelection => {
     const videoFiles = source.flatMap((item) => (item.file ? [item.file] : []));
     const existingVideos = source
       .filter((item) => !item.file && /^https?:\/\//i.test(item.url))
       .map((item) => item.url);
+
+    const highlightImageFiles = readyHighlights
+      .filter((item) => item.type === "photo" && item.file)
+      .map((item) => item.file as File);
+    const existingHighlightImages = readyHighlights
+      .filter((item) => item.type === "photo" && !item.file && /^https?:\/\//i.test(item.url))
+      .map((item) => item.url);
+
+    const highlightVideoFiles = readyHighlights
+      .filter((item) => item.type === "video" && item.file)
+      .map((item) => item.file as File);
+    const existingHighlightVideos = readyHighlights
+      .filter((item) => item.type === "video" && !item.file && /^https?:\/\//i.test(item.url))
+      .map((item) => item.url);
+
+    const structuredHighlights: SpaceHighlightItem[] = readyHighlights.map((item, idx) => ({
+      id: item.id,
+      type: item.type,
+      url: item.url,
+      title: item.title,
+      category: item.category,
+      duration: item.duration || highlightDurations[item.id],
+      order: idx + 1,
+    }));
+
     return {
       imageFiles: images.flatMap((item) => (item.file ? [item.file] : [])),
       existingImages: images
@@ -324,6 +428,11 @@ export default function AddSpaceModal({
       existingVideos,
       videoFile: videoFiles[0] ?? null,
       removeVideo: videoFiles.length === 0 && existingVideos.length === 0,
+      highlightImageFiles,
+      existingHighlightImages,
+      highlightVideoFiles,
+      existingHighlightVideos,
+      highlights: structuredHighlights,
     };
   };
 
@@ -383,6 +492,43 @@ export default function AddSpaceModal({
     });
   };
 
+  const addHighlightFiles = (files: File[]) => {
+    const valid = files.filter(
+      (file) => file.type.startsWith("image/") || file.type.startsWith("video/"),
+    );
+    if (!valid.length) return;
+    setHighlights((current) => [
+      ...current,
+      ...valid.map((file) => ({
+        id: `hl-${file.name}-${file.lastModified}-${Math.random()}`,
+        type: file.type.startsWith("video/") ? ("video" as const) : ("photo" as const),
+        url: URL.createObjectURL(file),
+        file,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        category: highlightCategory,
+      })),
+    ]);
+  };
+
+  const handleHighlightFiles = (e: ChangeEvent<HTMLInputElement>) => {
+    addHighlightFiles(Array.from(e.target.files || []));
+    e.target.value = "";
+  };
+
+  const removeHighlight = (id: string) => {
+    setHighlights((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target?.url.startsWith("blob:")) URL.revokeObjectURL(target.url);
+      return current.filter((item) => item.id !== id);
+    });
+  };
+
+  const updateHighlightCategory = (id: string, category: string) => {
+    setHighlights((current) =>
+      current.map((item) => (item.id === id ? { ...item, category } : item)),
+    );
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || loading || uploadingVideos) return;
@@ -411,7 +557,46 @@ export default function AddSpaceModal({
         setUploadingVideos(false);
       }
     }
-    const media = mediaSelection(readyVideos);
+
+    let readyHighlights = highlights;
+    const pendingHighlightVideos = highlights.filter(
+      (item) => item.file && item.type === "video",
+    );
+    if (pendingHighlightVideos.length > 0) {
+      try {
+        setUploadingVideos(true);
+        const urls = await uploadSpaceVideos(
+          pendingHighlightVideos.map((item) => item.file as File),
+        );
+        readyHighlights = readyHighlights.map((item) => {
+          const index = pendingHighlightVideos.findIndex((row) => row.id === item.id);
+          if (index < 0) return item;
+          if (item.url.startsWith("blob:")) URL.revokeObjectURL(item.url);
+          return { ...item, url: urls[index], file: undefined };
+        });
+        setHighlights(readyHighlights);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Could not upload the highlight videos.";
+        await Swal.fire("Highlight video upload failed", message, "error");
+        return;
+      } finally {
+        setUploadingVideos(false);
+      }
+    }
+
+    const media = mediaSelection(readyVideos, readyHighlights);
+    const highlightPayload: SpaceHighlightItem[] = readyHighlights.map((item, idx) => ({
+      id: item.id,
+      type: item.type,
+      url: item.url,
+      title: item.title,
+      category: item.category,
+      duration: item.duration || highlightDurations[item.id],
+      order: idx + 1,
+    }));
 
     const paired = initialSpace as (SpacePayload & {
       weekday?: SpacePayload;
@@ -433,6 +618,7 @@ export default function AddSpaceModal({
           weekdayStatus,
           weekendPrice: Number(weekendPrice || 0),
           weekendStatus,
+          highlights: highlightPayload,
         },
         media,
       );
@@ -453,6 +639,7 @@ export default function AddSpaceModal({
           weekdayStatus,
           weekendPrice: Number(weekendPrice || 0),
           weekendStatus,
+          highlights: highlightPayload,
         },
         media,
       );
@@ -470,6 +657,7 @@ export default function AddSpaceModal({
         day: dayMode === "Weekend" ? "Weekend" : "Weekday",
         price: Number((dayMode === "Weekend" ? weekendPrice : weekdayPrice) || 0),
         status: dayMode === "Weekend" ? weekendStatus : weekdayStatus,
+        highlights: highlightPayload,
       },
       media,
     );
@@ -899,6 +1087,164 @@ export default function AddSpaceModal({
                           <span className="mt-1 text-[10px] font-semibold">Add More</span>
                         </label>
                       ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Highlights Media Section */}
+                <div className="mt-5 space-y-3 border-t border-violet-100 pt-4">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                        <Sparkles size={15} className="text-violet-600" />
+                        Highlights Media (Images & Videos)
+                      </p>
+                      <span className="text-xs font-semibold text-violet-600">
+                        {highlights.length} items
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Upload photos & videos for the Highlights section in customer panel (Exclusive & Coworking).
+                    </p>
+                  </div>
+
+                  {/* Highlight Category Selection */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                    <span className="text-[11px] font-semibold text-slate-400 shrink-0">Default Category:</span>
+                    {HIGHLIGHT_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat.value}
+                        type="button"
+                        onClick={() => setHighlightCategory(cat.value)}
+                        className={`rounded-full px-2.5 py-1 font-bold transition capitalize cursor-pointer shrink-0 ${
+                          highlightCategory === cat.value
+                            ? "bg-violet-600 text-white shadow-2xs"
+                            : "border border-violet-200 bg-white text-slate-600 hover:bg-violet-50"
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Dropzone */}
+                  <label
+                    htmlFor="space-highlights"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setHighlightDrag(true);
+                    }}
+                    onDragLeave={() => setHighlightDrag(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setHighlightDrag(false);
+                      addHighlightFiles(Array.from(e.dataTransfer.files || []));
+                    }}
+                    className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed bg-white px-4 py-6 text-center transition ${
+                      highlightDrag
+                        ? "border-violet-500 bg-violet-50"
+                        : "border-violet-200 hover:border-violet-300"
+                    }`}
+                  >
+                    <div className="mb-2 flex items-center gap-2 text-violet-500">
+                      <Sparkles size={24} />
+                      <CloudUpload size={24} />
+                    </div>
+                    <span className="text-sm font-semibold text-violet-700">
+                      Upload Highlight Images & Videos
+                    </span>
+                    <span className="mt-0.5 text-xs text-slate-400">
+                      Add photos (JPG, PNG) or videos (MP4, MOV) to feature in highlights
+                    </span>
+                  </label>
+                  <input
+                    id="space-highlights"
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+                    onChange={handleHighlightFiles}
+                    className="hidden"
+                  />
+
+                  {/* Highlights Grid */}
+                  {highlights.length > 0 ? (
+                    <div className="flex gap-2 overflow-x-auto pb-2 pt-1">
+                      {highlights.map((item) => (
+                        <div
+                          key={item.id}
+                          className="relative h-24 w-[110px] shrink-0 overflow-hidden rounded-xl border border-violet-100 bg-slate-900 group"
+                        >
+                          {item.type === "video" ? (
+                            <>
+                              <video
+                                src={item.url}
+                                muted
+                                preload="metadata"
+                                className="h-full w-full object-cover"
+                                onLoadedMetadata={(e) => {
+                                  const dur = formatDuration(e.currentTarget.duration);
+                                  if (dur) {
+                                    setHighlightDurations((curr) => ({
+                                      ...curr,
+                                      [item.id]: dur,
+                                    }));
+                                  }
+                                }}
+                              />
+                              <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-slate-800">
+                                  <Play size={12} className="ml-0.5" />
+                                </span>
+                              </span>
+                              {item.duration || highlightDurations[item.id] ? (
+                                <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1 text-[9px] font-semibold text-white">
+                                  {item.duration || highlightDurations[item.id]}
+                                </span>
+                              ) : null}
+                            </>
+                          ) : (
+                            <img
+                              src={item.url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          )}
+
+                          {/* Category Badge & Selector */}
+                          <div className="absolute top-1 left-1 max-w-[70px]">
+                            <select
+                              value={item.category || "parties"}
+                              onChange={(e) => updateHighlightCategory(item.id, e.target.value)}
+                              className="w-full rounded bg-black/75 px-1 py-0.5 text-[9px] font-bold text-white capitalize outline-none cursor-pointer"
+                            >
+                              {HIGHLIGHT_CATEGORIES.map((c) => (
+                                <option key={c.value} value={c.value} className="bg-slate-900 text-white">
+                                  {c.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => removeHighlight(item.id)}
+                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-600 shadow cursor-pointer hover:bg-slate-100"
+                            aria-label="Remove highlight"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Add more tile */}
+                      <label
+                        htmlFor="space-highlights"
+                        className="flex h-24 w-[90px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-violet-200 bg-white text-violet-600 hover:border-violet-300"
+                      >
+                        <Plus size={16} />
+                        <span className="mt-1 text-[10px] font-semibold">Add More</span>
+                      </label>
                     </div>
                   ) : null}
                 </div>

@@ -26,6 +26,7 @@ import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
   formatInr,
   copySpaceLink,
+  setSpacePageMeta,
   SPACE_WHATSAPP,
 } from '../../components/spaces/spaceActions';
 import {
@@ -178,12 +179,29 @@ export const DEFAULT_COWORKING_PASSES: SpaceCard[] = [
   },
 ];
 
-export default function SpacesMarketplacePage() {
+type SpacesMarketplacePageProps = {
+  initialType?: 'Exclusive' | 'Coworking' | string;
+};
+
+export default function SpacesMarketplacePage({initialType}: SpacesMarketplacePageProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const getInitialSpaceType = () => {
+    const path = location.pathname.toLowerCase();
+    if (path.includes('/spaces/exclusive') || path === '/exclusive') return 'Exclusive';
+    if (path.includes('/spaces/coworking') || path === '/coworking') return 'Coworking';
+    if (initialType) return initialType;
+    const params = new URLSearchParams(location.search);
+    const qType = params.get('type') || params.get('tab') || '';
+    if (qType.toLowerCase() === 'coworking') return 'Coworking';
+    if (qType.toLowerCase() === 'exclusive') return 'Exclusive';
+    return '';
+  };
+
   const [spaces, setSpaces] = useState<SpaceCard[]>([]);
   const [search, setSearch] = useState('');
-  const [spaceType, setSpaceType] = useState('');
+  const [spaceType, setSpaceType] = useState(getInitialSpaceType);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<SpaceCard | null>(null);
@@ -195,15 +213,27 @@ export default function SpacesMarketplacePage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const qType = params.get('type') || params.get('tab') || '';
-    if (qType && (qType.toLowerCase() === 'coworking' || qType.toLowerCase() === 'exclusive')) {
-      setSpaceType(qType.charAt(0).toUpperCase() + qType.slice(1).toLowerCase());
+    const path = location.pathname.toLowerCase();
+    if (path.includes('/spaces/exclusive') || path === '/exclusive') {
+      setSpaceType('Exclusive');
+    } else if (path.includes('/spaces/coworking') || path === '/coworking') {
+      setSpaceType('Coworking');
+    } else {
+      const params = new URLSearchParams(location.search);
+      const qType = params.get('type') || params.get('tab') || '';
+      if (qType.toLowerCase() === 'coworking') {
+        setSpaceType('Coworking');
+      } else if (qType.toLowerCase() === 'exclusive') {
+        setSpaceType('Exclusive');
+      } else if (!initialType && path === '/spaces') {
+        setSpaceType('');
+      }
     }
+    const params = new URLSearchParams(location.search);
     if (params.get('ratecard') === 'true' || params.get('rateCard') === 'true') {
       setShowRateCardModal(true);
     }
-  }, [location.search]);
+  }, [location.pathname, location.search, initialType]);
 
   useEffect(() => {
     let restoreData: {
@@ -304,7 +334,7 @@ export default function SpacesMarketplacePage() {
       setBookingSpace(space);
     }
   };
-
+ 
   const handleShare = async (space: SpaceCard) => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setShareSpace(space);
@@ -317,6 +347,45 @@ export default function SpacesMarketplacePage() {
       toast.error('Failed to copy link');
     }
   };
+
+  const handleTabChange = (typeVal: string) => {
+    setSpaceType(typeVal);
+    const lower = typeVal.toLowerCase();
+    if (lower === 'exclusive') {
+      navigate('/spaces/exclusive');
+    } else if (lower === 'coworking') {
+      navigate('/spaces/coworking');
+    } else {
+      navigate('/spaces');
+    }
+  };
+
+  useEffect(() => {
+    const isCoworking = spaceType.toLowerCase() === 'coworking';
+    const isExclusive = spaceType.toLowerCase() === 'exclusive';
+    const title = isCoworking
+      ? 'Coworking Spaces & Passes · WooWoo Art House'
+      : isExclusive
+      ? 'Exclusive Spaces & Studios · WooWoo Art House'
+      : 'Spaces & Workstations · WooWoo Art House';
+    const description = isCoworking
+      ? 'Explore flexible day passes, weekly & monthly coworking workstations at WooWoo Art House.'
+      : isExclusive
+      ? 'Explore private creative studios, event halls & bespoke spaces at WooWoo Art House.'
+      : 'Find studios, workstations and event spaces at WooWoo Art House.';
+    const path = isCoworking ? '/spaces/coworking' : isExclusive ? '/spaces/exclusive' : '/spaces';
+    const url = `${window.location.origin}${path}`;
+    const image = isCoworking
+      ? DEFAULT_COWORKING_PASSES[0]?.imageUrl
+      : visible[0]?.imageUrl || visible[0]?.images?.[0] || null;
+
+    return setSpacePageMeta({
+      title,
+      description,
+      url,
+      image,
+    });
+  }, [spaceType, visible]);
 
   return (
     <div className="min-h-dvh bg-[#FAFBFD] text-left">
@@ -332,7 +401,13 @@ export default function SpacesMarketplacePage() {
               <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
             <div className="min-w-0">
-              <h1 className="truncate font-display text-xl font-bold text-[#111111]">Spaces</h1>
+              <h1 className="truncate font-display text-base sm:text-xl font-bold text-[#111111]">
+                {spaceType.toLowerCase() === 'coworking'
+                  ? 'Coworking'
+                  : spaceType.toLowerCase() === 'exclusive'
+                  ? 'Exclusive Spaces'
+                  : 'Spaces'}
+              </h1>
             </div>
           </div>
 
@@ -374,7 +449,7 @@ export default function SpacesMarketplacePage() {
                 <button
                   key={tab.label}
                   type="button"
-                  onClick={() => setSpaceType(tab.value)}
+                  onClick={() => handleTabChange(tab.value)}
                   className={`flex items-center justify-center gap-1.5 sm:gap-2 rounded-2xl border py-2.5 px-2 text-xs sm:text-sm font-bold transition cursor-pointer shadow-3xs ${
                     active
                       ? 'border-[#7C3AED] bg-[#F9F5FF] text-[#7C3AED]'

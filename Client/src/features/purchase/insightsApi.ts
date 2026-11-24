@@ -41,6 +41,20 @@ export type RankedItem = {
   hours?: number;
 };
 
+export type PaymentMethodRow = {
+  method: "cash" | "upi" | "wallet" | "card" | string;
+  label: string;
+  amount: number;
+  percentage: number;
+  bills: number;
+};
+
+export type SegmentPayments = {
+  total: number;
+  bills: number;
+  methods: PaymentMethodRow[];
+};
+
 export type SegmentCard = {
   key: "food" | "space" | "store" | "membership";
   label: string;
@@ -57,6 +71,7 @@ export type SegmentCard = {
   activeMembers?: number;
   expiredMembers?: number;
   topSellingMembership?: string;
+  payments?: SegmentPayments;
 };
 
 export type InsightsPayload = {
@@ -67,6 +82,13 @@ export type InsightsPayload = {
   previousRange: { from: string; to: string };
   totals: { revenue: number; bills: number; previousRevenue: number; changePct: number | null };
   segments: SegmentCard[];
+  payments?: {
+    all: SegmentPayments;
+    food: SegmentPayments;
+    space: SegmentPayments;
+    store: SegmentPayments;
+    membership: SegmentPayments;
+  };
   membership: {
     memberRevenue: number;
     otherRevenue: number;

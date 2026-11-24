@@ -236,12 +236,6 @@ const MENU_GROUPS: MenuGroup[] = [
         icon: FileSpreadsheet,
         path: "/inventory-payments",
       },
-      {
-        name: "Insights & Analytics",
-        label: "Insights & Analytics",
-        icon: GitGraphIcon,
-        path: "/insights-analytics",
-      },
     ],
   },
   {
@@ -451,6 +445,16 @@ export default function LeftSideBar({
   };
 
   useEffect(() => {
+    if (currentPath === "/") {
+      setActiveMenu("home");
+      setOpenMenu("");
+    }
+
+    if (currentPath === "/insights-analytics") {
+      setActiveMenu("insights-analytics");
+      setOpenMenu("");
+    }
+
     const isSalesRoute = [
       "/pos",
       "/creditnotes",
@@ -530,6 +534,7 @@ export default function LeftSideBar({
   );
 
   const showHome = canPath("/");
+  const showInsights = canPath("/insights-analytics");
 
   const handleToggleMenu = (menu: string) => {
     setOpenMenu(openMenu === menu ? "" : menu);
@@ -608,15 +613,33 @@ export default function LeftSideBar({
         {showHome ? (
           <button
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
-              activeMenu === "home"
+              activeMenu === "home" || currentPath === "/"
                 ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
                 : "text-gray-700 hover:bg-gray-50 hover:text-black"
             }`}
             onClick={() => handleMenuClick("home", "/")}
+            title={isCollapsed ? "Home" : undefined}
           >
             <LayoutDashboard size={20} className="text-gray-500" />
             {!isCollapsed && (
               <span className="text-[15px] font-semibold">Home</span>
+            )}
+          </button>
+        ) : null}
+
+        {showInsights ? (
+          <button
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
+              activeMenu === "insights-analytics" || currentPath === "/insights-analytics"
+                ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
+                : "text-gray-700 hover:bg-gray-50 hover:text-black"
+            }`}
+            onClick={() => handleMenuClick("insights-analytics", "/insights-analytics")}
+            title={isCollapsed ? "Insights & Analytics" : undefined}
+          >
+            <GitGraphIcon size={20} className="text-gray-500" />
+            {!isCollapsed && (
+              <span className="text-[15px] font-semibold">Insights</span>
             )}
           </button>
         ) : null}

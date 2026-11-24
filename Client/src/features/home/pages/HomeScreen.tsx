@@ -1151,7 +1151,7 @@ export default function HomeScreen() {
                   id: String(p?._id ?? i),
                   title: String(p?.productName || p?.name || "Product"),
                   subtitle: String(p?.category || "General"),
-                  meta: stock >= 3 ? "In stock" : "Out of stock",
+                  meta: stock > 0 ? "In stock" : "Out of stock",
                   amount: formatMoney(Number(p?.sellingPrice ?? 0)),
                   imageUrl: img,
                   stockQty: stock,
@@ -1818,7 +1818,7 @@ export default function HomeScreen() {
               id: String(p?._id ?? i),
               title: String(p?.productName || p?.name || "Product"),
               subtitle: String(p?.category || "General"),
-              meta: stock >= 3 ? "In stock" : "Out of stock",
+              meta: stock > 0 ? "In stock" : "Out of stock",
               amount: formatMoney(Number(p?.sellingPrice ?? 0)),
               imageUrl: img,
               stockQty: stock,
@@ -3536,14 +3536,14 @@ export default function HomeScreen() {
                           ) : tab === "products" ? (
                             <span
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs backdrop-blur-xs ${
-                                (row.stockQty ?? 0) >= 3 ||
+                                (row.stockQty ?? 0) > 0 ||
                                 row.meta === "In stock"
                                   ? "bg-emerald-500/90 text-white"
                                   : "bg-rose-500/90 text-white"
                               }`}
                             >
                               <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                              {(row.stockQty ?? 0) >= 3 ||
+                              {(row.stockQty ?? 0) > 0 ||
                               row.meta === "In stock"
                                 ? "In stock"
                                 : "Out of stock"}
@@ -4269,13 +4269,13 @@ export default function HomeScreen() {
                   <div className="flex flex-col items-end gap-1">
                     <span
                       className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        (viewProduct.stockQty ?? 0) < 3
+                        (viewProduct.stockQty ?? 0) <= 0
                           ? "bg-rose-100 text-rose-800"
                           : "bg-emerald-100 text-emerald-800"
                       }`}
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      {(viewProduct.stockQty ?? 0) < 3
+                      {(viewProduct.stockQty ?? 0) <= 0
                         ? "Out of Stock"
                         : "In Stock"}
                     </span>

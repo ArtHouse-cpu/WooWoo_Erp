@@ -114,8 +114,6 @@ export default function App() {
 
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
                 <Route path="/supplies" element={<SuppliesMarketplacePage />} />
-                <Route path="/spaces" element={<SpacesMarketplacePage />} />
-                <Route path="/coworking" element={<Navigate to="/spaces?type=coworking" replace />} />
               </Route>
             </Route>
 
@@ -136,8 +134,12 @@ export default function App() {
             <Route path="/help" element={< HelpScreen/>} />
             <Route path="/exhibition" element={<ExhibitionPage />} />
             <Route path="/supplies/product/:id" element={<PublicProductPage />} />
+            <Route path="/spaces" element={<SpacesMarketplacePage />} />
+            <Route path="/spaces/exclusive" element={<SpacesMarketplacePage initialType="Exclusive" />} />
+            <Route path="/spaces/coworking" element={<SpacesMarketplacePage initialType="Coworking" />} />
             <Route path="/spaces/space/:id" element={<PublicSpacePage />} />
-            <Route path="/coworking" element={<Navigate to="/spaces?type=coworking" replace />} />
+            <Route path="/exclusive" element={<Navigate to="/spaces/exclusive" replace />} />
+            <Route path="/coworking" element={<Navigate to="/spaces/coworking" replace />} />
             <Route path="/programs" element={<ProgramsPage />} />
             <Route path="/program" element={<ProgramsPage />} />
             <Route path="/program/csp" element={<ProgramsPage />} />

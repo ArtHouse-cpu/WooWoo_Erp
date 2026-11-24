@@ -25,34 +25,31 @@ router.post(
   signSpaceVideoUpload,
 );
 router.get('/:id', requirePermission(PERMISSIONS.SPACE_READ), getSpaceById);
+const spaceUploadFields = [
+  {name: 'images', maxCount: 8},
+  {name: 'image', maxCount: 1},
+  {name: 'video', maxCount: 4},
+  {name: 'highlightImages', maxCount: 16},
+  {name: 'highlightVideos', maxCount: 8},
+  {name: 'highlightVideo', maxCount: 8},
+];
+
 router.post(
   '/',
   requirePermission(PERMISSIONS.SPACE_CREATE),
-  uploadSpaceImage.fields([
-    {name: 'images', maxCount: 8},
-    {name: 'image', maxCount: 1},
-    {name: 'video', maxCount: 4},
-  ]),
+  uploadSpaceImage.fields(spaceUploadFields),
   createSpace,
 );
 router.put(
   '/:id',
   requirePermission(PERMISSIONS.SPACE_UPDATE),
-  uploadSpaceImage.fields([
-    {name: 'images', maxCount: 8},
-    {name: 'image', maxCount: 1},
-    {name: 'video', maxCount: 4},
-  ]),
+  uploadSpaceImage.fields(spaceUploadFields),
   updateSpace,
 );
 router.patch(
   '/:id',
   requirePermission(PERMISSIONS.SPACE_UPDATE),
-  uploadSpaceImage.fields([
-    {name: 'images', maxCount: 8},
-    {name: 'image', maxCount: 1},
-    {name: 'video', maxCount: 4},
-  ]),
+  uploadSpaceImage.fields(spaceUploadFields),
   updateSpace,
 );
 router.delete('/:id', requirePermission(PERMISSIONS.SPACE_DELETE), deleteSpace);
