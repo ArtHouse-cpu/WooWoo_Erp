@@ -371,6 +371,118 @@ export default function CustomerScreen() {
     }
   };
 
+  const handleCreditWallet = async (customer: CustomerRow) => {
+    const customerId = String(customer._id || "").trim();
+    if (!customerId) return;
+    setActionMenuCustomerId(null);
+
+    let withdrawable = Number(customer.withdrawable ?? customer.affiliateBalance ?? 0) || 0;
+    let nonWithdrawable = Number(customer.nonWithdrawable ?? customer.cashbackBalance ?? 0) || 0;
+    let totalAvailable = Number(customer.walletAmount ?? 0) || 0;
+    if (withdrawable + nonWithdrawable > 0) {
+      totalAvailable = Math.round((withdrawable + nonWithdrawable) * 100) / 100;
+    }
+
+    try {
+      const walletResponse = await handleGetWalletById(customerId);
+      const wallet = walletResponse?.wallet;
+      if (wallet) {
+        withdrawable = Number(wallet.withdrawable ?? withdrawable) || 0;
+        nonWithdrawable = Number(wallet.nonWithdrawable ?? nonWithdrawable) || 0;
+        totalAvailable = Number(wallet.walletAmount ?? wallet.totalBalance ?? totalAvailable) || 0;
+      }
+    } catch {
+      // Fall back to the amounts already on the customer row.
+    }
+
+    const safeName = String(customer.name || "Customer")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    const result = await Swal.fire({
+      title: '<h2 class="text-xl font-bold text-slate-800">Add Wallet Amount</h2>',
+      html: `
+        <div class="flex flex-col gap-4 text-left mt-2">
+          <div class="text-sm text-slate-500">
+            Customer: <strong class="text-slate-700">${safeName}</strong>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1.5">
+            <div class="flex justify-between"><span class="text-slate-500">Total</span><span class="font-semibold">₹ ${totalAvailable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Withdrawable</span><span class="font-semibold text-emerald-700">₹ ${withdrawable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Non-Withdrawable</span><span class="font-semibold text-slate-800">₹ ${nonWithdrawable.toLocaleString("en-IN")}</span></div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Wallet type <span class="text-red-500">*</span></label>
+            <select id="wallet-type" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
+              <option value="nonWithdrawable">Non-Withdrawable</option>
+              <option value="withdrawable">Withdrawable</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Amount (₹) <span class="text-red-500">*</span></label>
+            <input id="wallet-amount" type="number" min="0" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="Enter amount..." />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Note / Remark</label>
+            <input id="wallet-note" type="text" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="E.g., Cash added, Service refund..." />
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: "Add",
+      confirmButtonColor: "#16a34a",
+      cancelButtonColor: "#64748b",
+      customClass: {
+        popup: "rounded-2xl",
+        confirmButton: "px-6 py-2.5 rounded-lg font-semibold",
+        cancelButton: "px-6 py-2.5 rounded-lg font-semibold",
+      },
+      preConfirm: () => {
+        const amountInput = document.getElementById("wallet-amount") as HTMLInputElement | null;
+        const noteInput = document.getElementById("wallet-note") as HTMLInputElement | null;
+        const typeInput = document.getElementById("wallet-type") as HTMLSelectElement | null;
+        const amount = Number(amountInput?.value ?? 0);
+        const note = String(noteInput?.value ?? "").trim();
+        const walletType = typeInput?.value === "withdrawable" ? "withdrawable" : "nonWithdrawable";
+        if (!Number.isFinite(amount) || amount <= 0) {
+          Swal.showValidationMessage("Enter a valid amount.");
+          return undefined;
+        }
+        return { amount, note, walletType };
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    try {
+      await handleUpdateWallet(customerId, {
+        type: "credit",
+        amount: result.value.amount,
+        note: result.value.note,
+        walletType: result.value.walletType,
+        customerId,
+        customerName: customer.name,
+        customerPhone: customer.mobile,
+        createdBy: {
+          m_staff_id: staff?.m_staff_id,
+          m_staff_name: staff?.m_staff_name,
+          m_staff_email: staff?.m_staff_email,
+        },
+      });
+      await fetchCustomers();
+      await Swal.fire("Updated", "Wallet amount added successfully.", "success");
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Wallet update failed",
+        err?.response?.data?.message ?? "Could not add this wallet amount.",
+        "error",
+      );
+    }
+  };
+
   const handleDeductWallet = async (customer: CustomerRow) => {
     const customerId = String(customer._id || "").trim();
     if (!customerId) return;
@@ -1272,6 +1384,30 @@ export default function CustomerScreen() {
                           <div className="flex items-center gap-1.5 font-semibold text-slate-900">
                             <Wallet size={13} className="text-slate-400 shrink-0" />
                             <span>₹{walletVal.toLocaleString("en-IN")}</span>
+                            <Can permission={PERMISSIONS.WALLET_MANAGE}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleCreditWallet(customer);
+                                }}
+                                title="Add to wallet"
+                                className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                              >
+                                <Plus size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleDeductWallet(customer);
+                                }}
+                                title="Deduct from wallet"
+                                className="flex h-6 w-6 items-center justify-center rounded-md bg-rose-50 text-rose-600 hover:bg-rose-100"
+                              >
+                                <Minus size={13} />
+                              </button>
+                            </Can>
                           </div>
                         </td>
                       )}
@@ -1326,20 +1462,6 @@ export default function CustomerScreen() {
                                 className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition cursor-pointer"
                               >
                                 <SquarePen size={14} />
-                              </button>
-                            </Can>
-
-                            <Can permission={PERMISSIONS.WALLET_MANAGE}>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleDeductWallet(customer);
-                                }}
-                                title="Deduct from wallet"
-                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
-                              >
-                                <Minus size={14} />
                               </button>
                             </Can>
 
@@ -1638,6 +1760,10 @@ export default function CustomerScreen() {
                       </p>
                     )}
                   </div>
+                  <div className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-900">
+                    <Wallet size={13} className="text-slate-400" />
+                    <span>₹{Number(customer.walletAmount || 0).toLocaleString("en-IN")}</span>
+                  </div>
                 </div>
 
                 {/* Bottom: Phone Direct Contact + 3 Dots Action Menu */}
@@ -1731,6 +1857,17 @@ export default function CustomerScreen() {
                             >
                               <Minus size={14} className="text-rose-500" />
                               <span>Deduct from wallet</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleCreditWallet(customer);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <Plus size={14} className="text-emerald-600" />
+                              <span>Add in wallet</span>
                             </button>
                           </Can>
                           <button
