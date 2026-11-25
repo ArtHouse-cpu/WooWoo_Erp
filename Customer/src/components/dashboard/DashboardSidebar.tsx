@@ -1,9 +1,12 @@
+import {useState, useEffect} from 'react';
 import {Link, useLocation} from 'react-router-dom';
 import {ChevronRight, Crown, Store, User, X} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {BrandMark} from '../auth/AuthShell';
 import {dashboardNav} from '../../data/dashboard';
 import {useCspApplication} from '../../hooks/useCspApplication';
+import {useAuthStore} from '../../store/authStore';
+import {authApi} from '../../services/auth.service';
 
 type Props = {
   mode?: 'fixed' | 'drawer';
@@ -15,6 +18,27 @@ type Props = {
 export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgramsClick}: Props) {
   const location = useLocation();
   const {application} = useCspApplication();
+  const customer = useAuthStore(s => s.customer);
+  const storeBalance = Number(customer?.walletBalance ?? customer?.walletAmount ?? 0);
+  const [liveBalance, setLiveBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    authApi
+      .getWalletDashboard()
+      .then(res => {
+        const bal = res.data?.data?.balances?.totalAvailable;
+        if (active && typeof bal === 'number' && !Number.isNaN(bal)) {
+          setLiveBalance(bal);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [customer?._id, customer?.walletBalance, customer?.walletAmount]);
+
+  const walletBalance = liveBalance ?? storeBalance;
   const isDrawer = mode === 'drawer';
 
   const sections = ['Main'] as const;
@@ -88,6 +112,45 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
                           <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
                           {item.label}
                         </button>
+                      </li>
+                    );
+                  }
+
+                  if (item.id === 'wallet' && item.to) {
+                    return (
+                      <li key={item.id}>
+                        <Link
+                          to={item.to}
+                          onClick={onClose}
+                          className={`group flex h-12 w-full items-center justify-between rounded-[14px] px-3 text-[14px] font-medium transition ${
+                            active
+                              ? 'bg-[#F5F0FF] text-[#673DE6] font-semibold'
+                              : 'text-[#374151] hover:bg-[#F3F4F6]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <span
+                              className={`text-[13px] font-bold tabular-nums ${
+                                active ? 'text-[#673DE6]' : 'text-[#111111]'
+                              }`}
+                            >
+                              ₹{walletBalance.toLocaleString('en-IN', {minimumFractionDigits: 0})}
+                            </span>
+                            <span
+                              className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
+                                active
+                                  ? 'bg-[#673DE6] text-white shadow-xs'
+                                  : 'bg-slate-100 text-[#6B7280] group-hover:bg-[#673DE6] group-hover:text-white'
+                              }`}
+                            >
+                              <ChevronRight className="h-3.5 w-3.5 stroke-[2.5]" />
+                            </span>
+                          </div>
+                        </Link>
                       </li>
                     );
                   }

@@ -35,6 +35,9 @@ import {
   Search,
   Trash2,
   Upload,
+  Play,
+  Target,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardSidebar } from "../../components/dashboard/DashboardSidebar";
@@ -2140,19 +2143,268 @@ function ProgramAccessCard({
     );
   }
 
+  return <CspNotEnrolledView onApply={onApply} helpUrl={helpUrl} />;
+}
+
+// Custom SVG illustrations for high-fidelity rendering
+function CspIllustration() {
   return (
-    <div className="mx-auto max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h1 className="text-xl font-bold text-slate-900">CSP Program</h1>
-      <p className="mt-3 text-sm text-slate-600">
-        Apply to join. The product program opens only after your application is approved.
-      </p>
-      <button
-        type="button"
-        onClick={onApply}
-        className="mt-5 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white"
+    <div className="relative h-20 w-24 sm:h-24 sm:w-28 shrink-0 flex items-center justify-center bg-transparent overflow-visible">
+      {/* Easel/Art board SVG */}
+      <svg
+        className="w-12 h-12 text-[#EA580C] relative z-10"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
       >
-        Apply for CSP Program
-      </button>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9.813 15.904L9 21m0 0l-.813-5.096M9 21h6m-1.813-5.096L15 21m0 0l.813-5.096M3 14.25V6.75A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75v7.5A2.25 2.25 0 0118.75 16.5H5.25A2.25 2.25 0 013 14.25z"
+        />
+      </svg>
+      {/* Tote bag overlay */}
+      <div className="absolute bottom-1 right-1 w-9 h-11 bg-white border border-[#FFEDD5] rounded-lg shadow-2xs flex flex-col items-center justify-between p-1 z-20">
+        <div className="w-4 h-2.5 border-2 border-slate-300 border-b-0 rounded-t-full" />
+        <div className="text-[5px] text-[#EA580C] font-black leading-none">
+          WOOWOO
+        </div>
+        <div className="text-[4px] text-slate-400 font-bold leading-none">
+          ART HOUSE
+        </div>
+      </div>
+      {/* Palette overlay */}
+      <div className="absolute top-1 left-2 w-7 h-7 bg-amber-50 rounded-full border border-amber-200 shadow-3xs p-1 flex flex-wrap gap-0.5 justify-center items-center z-20">
+        <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+        <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+        <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
+      </div>
+    </div>
+  );
+}
+
+const CSP_GALLERY_ITEMS = [
+  {
+    id: "csp-vid-1",
+    type: "video",
+    image:
+      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=400&q=80",
+    tag: "VIDEO",
+    title: "Creative sailors",
+    hasPlayButton: true,
+  },
+  {
+    id: "csp-img-1",
+    type: "image",
+    image:
+      "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=400&q=80",
+    tag: "IMAGE",
+  },
+  {
+    id: "csp-vid-2",
+    type: "video",
+    image:
+      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&q=80",
+    tag: "VIDEO",
+    hasPlayButton: true,
+  },
+  {
+    id: "csp-img-2",
+    type: "image",
+    image:
+      "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80",
+    tag: "IMAGE",
+  },
+  {
+    id: "csp-img-3",
+    type: "image",
+    image:
+      "https://images.unsplash.com/photo-1579783928621-7a13d66a62d1?auto=format&fit=crop&w=400&q=80",
+    tag: "IMAGE",
+  },
+];
+
+function CspNotEnrolledView({
+  onApply,
+  helpUrl,
+}: {
+  onApply: () => void;
+  helpUrl?: string;
+}) {
+  const [activeGalleryDot, setActiveGalleryDot] = useState(0);
+  const galleryScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleGalleryScroll = () => {
+    if (!galleryScrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = galleryScrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const progress = scrollLeft / maxScroll;
+    const dotIndex = Math.min(4, Math.max(0, Math.round(progress * 4)));
+    setActiveGalleryDot(dotIndex);
+  };
+
+  const scrollToGalleryDot = (idx: number) => {
+    setActiveGalleryDot(idx);
+    if (!galleryScrollRef.current) return;
+    const { scrollWidth, clientWidth } = galleryScrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    galleryScrollRef.current.scrollTo({
+      left: (idx / 4) * maxScroll,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <div className="mx-auto max-w-lg rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+      {/* Horizontal Gallery */}
+      <div
+        ref={galleryScrollRef}
+        onScroll={handleGalleryScroll}
+        className="flex gap-3 overflow-x-auto scrollbar-none py-1 snap-x snap-mandatory"
+      >
+        {CSP_GALLERY_ITEMS.map((item) => (
+          <div
+            key={item.id}
+            className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
+          >
+            <img
+              src={item.image}
+              alt={item.tag}
+              className="h-full w-full object-cover"
+            />
+
+            {/* Media Type Badge */}
+            <div className="absolute left-2.5 top-2.5 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7.5px] font-black text-white tracking-wider">
+              {item.tag}
+            </div>
+
+            {/* Play Button Overlay */}
+            {item.hasPlayButton && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/30 text-white border border-white/40 shadow-sm backdrop-blur-xs">
+                  <Play className="h-3 w-3 fill-white text-white ml-0.5" />
+                </div>
+              </div>
+            )}
+
+            {/* Footer text title */}
+            {item.title && (
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 text-left">
+                <p className="text-[10px] font-extrabold text-white tracking-wide leading-tight">
+                  {item.title}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination Dots */}
+      <div className="flex justify-center gap-1.5 my-1">
+        {[0, 1, 2, 3, 4].map((idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => scrollToGalleryDot(idx)}
+            className={`h-1.5 rounded-full transition-all duration-200 ${
+              activeGalleryDot === idx
+                ? "bg-[#EA580C] w-3.5"
+                : "bg-[#E5E7EB] w-1.5"
+            }`}
+            aria-label={`Go to slide ${idx + 1}`}
+          />
+        ))}
+      </div>
+
+      {/* Statistics Grid */}
+      <div className="grid grid-cols-3 gap-2.5">
+        {/* Stat 1 */}
+        <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#FFF8F2] border border-[#FFEDD5] text-center">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FFF0EB] text-[#EA580C] mb-2">
+            <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
+          </div>
+          <div className="text-[13px] font-black text-slate-900 leading-none">
+            50+
+          </div>
+          <div className="mt-1 text-[8.5px] font-extrabold text-[#7C2D12] leading-tight">
+            Creative sailors
+          </div>
+        </div>
+        {/* Stat 2 */}
+        <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2">
+            <IndianRupee className="h-4.5 w-4.5" strokeWidth={2.25} />
+          </div>
+          <div className="text-[13px] font-black text-slate-900 leading-none">
+            ₹25 Lakhs+
+          </div>
+          <div className="mt-1 text-[8.5px] font-extrabold text-[#14532D] leading-tight">
+            Revenue Gen
+          </div>
+        </div>
+        {/* Stat 3 */}
+        <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2">
+            <Target className="h-4.5 w-4.5" strokeWidth={2.25} />
+          </div>
+          <div className="text-[13px] font-black text-slate-900 leading-none">
+            5K+
+          </div>
+          <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
+            Customer Leads
+          </div>
+        </div>
+      </div>
+
+      {/* Main Detailed Info Card */}
+      <div className="p-4 rounded-[24px] border border-slate-100 bg-[#FAFBFD] relative overflow-hidden text-left shadow-2xs">
+        <div className="flex justify-between items-start gap-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center text-[11px] font-black h-5 w-5 rounded-md leading-none bg-[#EA580C] text-white">
+                01
+              </span>
+              <h4 className="text-[15px] font-black text-slate-900 leading-none">
+                Creative Sailor Program
+              </h4>
+            </div>
+
+            <p className="mt-3.5 text-[11.5px] font-bold text-slate-500 leading-relaxed max-w-[80%] sm:max-w-[75%]">
+              A zero-cost opportunity for creative professionals and small businesses to sell their products directly at WOO WOO Art House.
+            </p>
+          </div>
+
+          <CspIllustration />
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            const text = "Hi! I would like to know more about the Creative Sailor Program (CSP) at Woo Woo Art House.";
+            window.open(helpUrl || `https://wa.me/918073988123?text=${encodeURIComponent(text)}`, "_blank");
+          }}
+          className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] hover:bg-[#FFF8F2] text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+        >
+          <MessageSquare className="h-4.5 w-4.5" strokeWidth={2.5} />
+          <span>Query</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onApply}
+          className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] hover:bg-[#D97706] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+        >
+          <span>Join / Apply</span>
+          <ArrowRight className="h-4.5 w-4.5" strokeWidth={2.5} />
+        </button>
+      </div>
     </div>
   );
 }
