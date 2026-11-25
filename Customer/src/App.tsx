@@ -103,8 +103,8 @@ export default function App() {
                 <Route path="/ourprograms" element={<OurProgramsPage />} />
                 <Route path="/ourprograms/:tab" element={<OurProgramsPage />} />
                 <Route path="/program/csp" element={<ProgramsPage />} />
-                <Route path="/program/cvp" element={<OurProgramsPage defaultTab="cvp" />} />
-                <Route path="/program/hap" element={<OurProgramsPage defaultTab="hap" />} />
+                <Route path="/program/cvp" element={<CvpProgramPage />} />
+                <Route path="/program/hap" element={<HapProgramPage />} />
                 <Route path="/program/:tab" element={<OurProgramsPage />} />
                 <Route path="/programs/:tab" element={<OurProgramsPage />} />
                 <Route path="/booking" element={<MyBookingsPage />} />

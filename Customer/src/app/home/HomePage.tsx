@@ -1,8 +1,7 @@
 import {useEffect, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
-import {TopNavbar, MobileHeader} from '../../components/dashboard/TopNavbar';
-import {HeroBanner} from '../../components/dashboard/HeroBanner';
+import {MobileHeader} from '../../components/dashboard/TopNavbar';
 import {
   ActionCards,
   ExploreGrid,
@@ -95,11 +94,6 @@ export default function HomePage() {
           />
 
           <div className="min-w-0 flex-1 space-y-6">
-            <TopNavbar
-              onMenuClick={() => setSidebarOpen(true)}
-              onNotificationClick={() => setNotificationsOpen(true)}
-            />
-            <HeroBanner />
             <ExploreGrid onItemClick={handleExploreClick} />
             <MembershipBanner />
             <ActionCards onActionClick={handleActionClick} />
@@ -114,7 +108,6 @@ export default function HomePage() {
           />
 
           <div className="space-y-5 pb-20">
-            <HeroBanner />
             <ExploreGrid onItemClick={handleExploreClick} />
             <MembershipBanner />
           </div>

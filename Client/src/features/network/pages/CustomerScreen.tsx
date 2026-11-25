@@ -1122,24 +1122,6 @@ export default function CustomerScreen() {
                   </th>
                 )}
 
-                {/* Membership */}
-                {visibleColumns.membership && (
-                  <th className="py-3 px-3">
-                    <button
-                      type="button"
-                      onClick={() => handleSort("membership")}
-                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
-                    >
-                      <span>Membership</span>
-                      {sortKey === "membership" ? (
-                        sortDir === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />
-                      ) : (
-                        <ArrowUpDown size={12} className="text-slate-400" />
-                      )}
-                    </button>
-                  </th>
-                )}
-
                 {/* Wallet Amount */}
                 {visibleColumns.walletAmount && (
                   <th className="py-3 px-3">
@@ -1188,13 +1170,13 @@ export default function CustomerScreen() {
             <tbody className="divide-y divide-slate-50">
               {loadingCustomers && processedCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     Loading customers...
                   </td>
                 </tr>
               ) : processedCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     No customers found
                   </td>
                 </tr>
@@ -1239,22 +1221,38 @@ export default function CustomerScreen() {
                         />
                       </td>
 
-                      {/* Customer Avatar + Name */}
+                      {/* Customer Avatar + Name & Membership */}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2.5">
                           <div
-                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black uppercase ${palette.bg} ${palette.text}`}
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-black uppercase ${palette.bg} ${palette.text}`}
                           >
                             {userInitials}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setCustomer360(customer)}
-                            className="font-extrabold text-[#2563EB] hover:underline cursor-pointer text-left truncate block max-w-[180px]"
-                            title={`View ${customer.name} 360`}
-                          >
-                            {customer.name || "—"}
-                          </button>
+                          <div className="flex flex-col min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => setCustomer360(customer)}
+                              className="font-extrabold text-[#2563EB] hover:underline cursor-pointer text-left truncate block max-w-[180px] leading-tight"
+                              title={`View ${customer.name} 360`}
+                            >
+                              {customer.name || "—"}
+                            </button>
+                            {visibleColumns.membership !== false && (
+                              <div className="mt-1 flex items-center">
+                                {isMember ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60 shadow-2xs leading-none">
+                                    <Crown size={10} className="text-emerald-600 fill-emerald-600/20" />
+                                    <span>{membershipLabel === "Member" ? "Member" : membershipLabel}</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 leading-none">
+                                    Non-Member
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -1265,22 +1263,6 @@ export default function CustomerScreen() {
                             <Phone size={12} className="text-slate-400 shrink-0" />
                             <span>{customer.mobile || "—"}</span>
                           </div>
-                        </td>
-                      )}
-
-                      {/* Membership */}
-                      {visibleColumns.membership && (
-                        <td className="py-3 px-3">
-                          {isMember ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/60 shadow-2xs">
-                              <Crown size={12} className="text-emerald-600 fill-emerald-600/20" />
-                              <span>{membershipLabel === "Member" ? "Member" : membershipLabel}</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
-                              Non-Member
-                            </span>
-                          )}
                         </td>
                       )}
 

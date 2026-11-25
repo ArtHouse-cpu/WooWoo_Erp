@@ -29,7 +29,7 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
         </h2>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-6 lg:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 lg:gap-4">
         {exploreItemsDesktop.map((item, i) => {
           return (
             <motion.button

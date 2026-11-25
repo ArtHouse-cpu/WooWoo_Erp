@@ -668,8 +668,8 @@ export function ProgramsBottomSheet({
     if (!asPage) {
       onClose();
     }
-    const path = tab === "csp" ? "/program" : tab === "hap" ? "/program/hap" : "/program/cvp";
-    navigate(path, { replace: asPage });
+    const path = tab === "csp" ? "/program/csp" : tab === "hap" ? "/program/hap" : "/program/cvp";
+    navigate(path);
   };
 
   // Sync active tab with initialTab prop when modal opens
@@ -952,7 +952,7 @@ export function ProgramsBottomSheet({
     <>
       <AnimatePresence>
         {(asPage || isOpen) && (
-          <div className={asPage ? "min-h-dvh bg-[#F6F5FB] md:flex md:justify-center md:px-6 md:py-6" : "fixed inset-0 z-50 flex items-end justify-center"}>
+          <div className={asPage ? "min-h-dvh bg-[#F6F5FB] flex justify-center items-end sm:items-center md:items-center px-0 md:px-6 py-0 md:py-6" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"}>
             {asPage ? null : (
             <motion.div
               initial={{ opacity: 0 }}
@@ -970,8 +970,8 @@ export function ProgramsBottomSheet({
               transition={{ type: "spring", damping: 26, stiffness: 240 }}
               className={
                 asPage
-                  ? "relative flex h-dvh w-full max-w-3xl flex-col overflow-hidden bg-white md:h-[calc(100dvh-3rem)] md:rounded-[32px] md:border md:border-slate-100 md:shadow-sm"
-                  : "relative z-10 flex max-h-[90dvh] h-auto w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
+                  ? `relative flex ${isCurrentProgramJoined ? "h-auto max-h-dvh" : "h-dvh md:h-auto"} w-full max-w-3xl flex-col overflow-hidden bg-white md:max-h-[calc(100dvh-3rem)] rounded-t-[32px] md:rounded-[32px] md:border md:border-slate-100 shadow-sm`
+                  : "relative z-10 flex max-h-[90dvh] h-auto w-full max-w-lg flex-col rounded-t-[32px] sm:rounded-[32px] bg-white shadow-2xl overflow-hidden border-t sm:border border-slate-100"
               }
             >
               {asPage ? null : (
@@ -1067,7 +1067,7 @@ export function ProgramsBottomSheet({
               </div>
 
               {/* Scrollable Contents - Non-rigid content-driven height */}
-              <div className={`min-h-0 overflow-y-auto ${asPage ? "flex-1" : "flex-initial"} ${activeTab === "all" ? "pb-2" : "pb-5"} [scrollbar-gutter:stable]`}>
+              <div className={`min-h-0 overflow-y-auto ${asPage && !isCurrentProgramJoined ? "flex-1" : "flex-initial"} ${activeTab === "all" || isCurrentProgramJoined ? "pb-2" : "pb-5"} [scrollbar-gutter:stable]`}>
                 {activeTab === "all" ? (
                   /* ALL PROGRAMS OVERVIEW TAB */
                   <div className="space-y-3 px-4 sm:px-5 pb-1 text-left">
@@ -1612,7 +1612,9 @@ export function ProgramsBottomSheet({
                     }`}
                   >
                     <LayoutDashboard className="h-4.5 w-4.5" strokeWidth={2.2} />
-                    <span>Open Dashboard</span>
+                    <span>
+                      Open {activeTab === "csp" ? "CSP" : activeTab === "hap" ? "HAP" : "CVP"} Dashboard
+                    </span>
                   </button>
                 ) : (
                   <>
