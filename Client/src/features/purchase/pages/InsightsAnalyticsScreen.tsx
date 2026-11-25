@@ -187,13 +187,15 @@ const InsightsAnalyticsScreen = () => {
       <div className="mx-auto max-w-7xl space-y-3 sm:space-y-3.5">
         {/* ================= TOP HEADER WITH INTEGRATED PRIMARY TABS ================= */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
-          {/* Left on desktop / Top row on mobile: Insights title and Customer filter icon button, plus mobile Date filter */}
+          {/* Left on desktop / Top row on mobile: Insights title on left, Customer filter + Date filter on right (mobile) */}
           <div className="flex items-center justify-between md:justify-start gap-2.5 sm:gap-3 min-w-0">
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <h1 className="truncate text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                Insights
-              </h1>
-              {/* Customer filter icon button (both mobile and desktop) */}
+            <h1 className="truncate text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+              Insights
+            </h1>
+
+            {/* Mobile Only: Customer filter icon button + Date filter */}
+            <div className="flex items-center gap-2 shrink-0 md:hidden">
+              {/* Customer filter icon button (placed to the left of Date filter on mobile) */}
               <div className="relative">
                 <button
                   type="button"
@@ -224,30 +226,30 @@ const InsightsAnalyticsScreen = () => {
                   <option value="nonmember">Non-membership</option>
                 </select>
               </div>
-            </div>
 
-            {/* Mobile Only: Date filter */}
-            <div className="relative shrink-0 md:hidden">
-              <div className="flex items-center gap-2 rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_10px_rgba(103,61,230,0.08)] border border-purple-100/90 text-slate-800 font-bold text-xs pointer-events-none">
-                <Calendar size={15} className="text-[#673DE6]" strokeWidth={2.2} />
-                <span>{PRESETS.find(p => p.id === preset)?.label || "Date"}</span>
-                <ChevronDown size={14} className="text-slate-500" strokeWidth={2.5} />
+              {/* Date filter */}
+              <div className="relative shrink-0">
+                <div className="flex items-center gap-2 rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_10px_rgba(103,61,230,0.08)] border border-purple-100/90 text-slate-800 font-bold text-xs pointer-events-none">
+                  <Calendar size={15} className="text-[#673DE6]" strokeWidth={2.2} />
+                  <span>{PRESETS.find(p => p.id === preset)?.label || "Date"}</span>
+                  <ChevronDown size={14} className="text-slate-500" strokeWidth={2.5} />
+                </div>
+                <select
+                  value={preset}
+                  onChange={e => setPreset(e.target.value as InsightPreset)}
+                  aria-label="Date range filter"
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                >
+                  {PRESETS.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
               </div>
-              <select
-                value={preset}
-                onChange={e => setPreset(e.target.value as InsightPreset)}
-                aria-label="Date range filter"
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              >
-                {PRESETS.map(item => (
-                  <option key={item.id} value={item.id}>{item.label}</option>
-                ))}
-              </select>
             </div>
           </div>
 
-          {/* Center on desktop: Primary Tabs (Overall | Food | Store | Space | Membership) */}
-          <div className="w-full md:w-auto md:flex-1 md:flex md:justify-center">
+          {/* Mobile Only: Primary Tabs */}
+          <div className="w-full md:hidden">
             <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none p-1 bg-white/95 backdrop-blur-xs rounded-2xl border border-purple-100/90 shadow-[0_2px_10px_rgba(103,61,230,0.06)]">
               {PRIMARY_TABS.map(tab => {
                 const active = segment === tab.id;
@@ -256,7 +258,7 @@ const InsightsAnalyticsScreen = () => {
                     key={tab.id}
                     type="button"
                     onClick={() => setSegment(tab.id)}
-                    className={`flex-1 md:flex-initial min-w-[64px] py-2 px-3 md:px-5 text-center text-xs md:text-sm font-bold rounded-xl md:rounded-2xl transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                    className={`flex-1 min-w-[64px] py-2 px-3 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
                       active
                         ? "bg-[#673DE6] text-white shadow-[0_2px_8px_rgba(103,61,230,0.28)]"
                         : "text-slate-600 hover:text-slate-900 hover:bg-purple-50/60"
@@ -269,8 +271,55 @@ const InsightsAnalyticsScreen = () => {
             </div>
           </div>
 
-          {/* Desktop Only: Date filter at extreme right */}
-          <div className="hidden md:flex items-center shrink-0">
+          {/* Desktop Only: Primary Tabs + Customer Filter + Date Filter tightly grouped at right */}
+          <div className="hidden md:flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Primary Tabs */}
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none p-1 bg-white/95 backdrop-blur-xs rounded-2xl border border-purple-100/90 shadow-[0_2px_10px_rgba(103,61,230,0.06)]">
+              {PRIMARY_TABS.map(tab => {
+                const active = segment === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSegment(tab.id)}
+                    className={`py-2 px-3 lg:px-5 text-center text-xs md:text-sm font-bold rounded-xl md:rounded-2xl transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                      active
+                        ? "bg-[#673DE6] text-white shadow-[0_2px_8px_rgba(103,61,230,0.28)]"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-purple-50/60"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Customer filter pill (styled like Date filter) */}
+            <div className="relative shrink-0">
+              <div
+                className={`flex items-center gap-2 rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_10px_rgba(103,61,230,0.08)] border transition pointer-events-none text-xs font-bold ${
+                  membership !== "all"
+                    ? "border-[#673DE6] text-[#673DE6]"
+                    : "border-purple-100/90 text-slate-800"
+                }`}
+              >
+                <Users size={15} className="text-[#673DE6]" strokeWidth={2.2} />
+                <span>{membershipLabel}</span>
+                <ChevronDown size={14} className="text-slate-500" strokeWidth={2.5} />
+              </div>
+              <select
+                value={membership}
+                onChange={e => setMembership(e.target.value as InsightMembership)}
+                aria-label="Customer filter"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+              >
+                <option value="all">All Customers</option>
+                <option value="member">Membership</option>
+                <option value="nonmember">Non-membership</option>
+              </select>
+            </div>
+
+            {/* Date filter */}
             <div className="relative shrink-0">
               <div className="flex items-center gap-2 rounded-2xl bg-white px-3.5 py-2.5 shadow-[0_2px_10px_rgba(103,61,230,0.08)] border border-purple-100/90 text-slate-800 font-bold text-xs pointer-events-none">
                 <Calendar size={15} className="text-[#673DE6]" strokeWidth={2.2} />

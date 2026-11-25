@@ -297,7 +297,7 @@ export default function SpaceUtilizationPanel({
       </article>
 
       {/* 3. Space Types distribution pie & booking details table */}
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.8fr)]">
+      <div className="space-y-3">
         <article className="rounded-2xl border border-purple-100/80 bg-white p-3.5 sm:p-4 shadow-xs">
           <h3 className="text-xs sm:text-sm font-bold text-slate-900">Space Types Breakdown</h3>
           <p className="text-[10px] sm:text-[11px] text-slate-500">Share of booked hours</p>
