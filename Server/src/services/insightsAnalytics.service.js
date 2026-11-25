@@ -727,6 +727,76 @@ export const getInsights = async query => {
   }
 };
 
+const MEMBERSHIP_TYPE_DEFS = [
+  {key: 'membership', label: 'Membership'},
+  {key: 'premium', label: 'Premium Membership'},
+  {key: 'special', label: 'Special Membership'},
+  {key: 'junior', label: 'Junior Membership'},
+];
+
+const membershipTypeKey = (sub, planDisplayMap) => {
+  const planId = String(sub?.membershipPlanId || '').trim();
+  const type = String(sub?.membershipType || '').trim();
+  const display =
+    planDisplayMap.get(planId.toLowerCase()) ||
+    planDisplayMap.get(planId) ||
+    planDisplayMap.get(type.toLowerCase()) ||
+    type ||
+    planId;
+  const blob = `${display} ${type} ${planId}`.toLowerCase();
+  if (blob.includes('junior')) return 'junior';
+  if (blob.includes('premium')) return 'premium';
+  if (blob.includes('special')) return 'special';
+  if (blob.includes('elite')) return 'elite';
+  if (!blob.trim() || ['none', 'regular', 'non-member', 'nonmember'].includes(type.toLowerCase())) {
+    return '';
+  }
+  return 'membership';
+};
+
+const tallyMembershipTypes = (subs, planDisplayMap) => {
+  const rows = new Map(
+    MEMBERSHIP_TYPE_DEFS.map(type => [type.key, {label: type.label, revenue: 0, bills: 0, qty: 0}]),
+  );
+  for (const sub of subs || []) {
+    const key = membershipTypeKey(sub, planDisplayMap);
+    if (!key) continue;
+    if (!rows.has(key)) {
+      const label = key.charAt(0).toUpperCase() + key.slice(1) + ' Membership';
+      rows.set(key, {label, revenue: 0, bills: 0, qty: 0});
+    }
+    const row = rows.get(key);
+    row.revenue = roundMoney(row.revenue + (Number(sub.grandTotal ?? sub.amount ?? 0) || 0));
+    row.bills += 1;
+    row.qty += 1;
+  }
+  return rows;
+};
+
+const formatMembershipTypes = (currentMap, previousMap) => {
+  const total = [...currentMap.values()].reduce((sum, row) => sum + row.revenue, 0);
+  const keys = [
+    ...MEMBERSHIP_TYPE_DEFS.map(type => type.key),
+    ...[...currentMap.keys()].filter(key => !MEMBERSHIP_TYPE_DEFS.some(type => type.key === key)),
+  ];
+  return keys
+    .filter(key => MEMBERSHIP_TYPE_DEFS.some(type => type.key === key) || (currentMap.get(key)?.bills || 0) > 0)
+    .map(key => {
+      const current = currentMap.get(key) || {label: key, revenue: 0, bills: 0, qty: 0};
+      const previous = previousMap.get(key)?.revenue || 0;
+      return {
+        key,
+        label: current.label,
+        revenue: roundMoney(current.revenue),
+        bills: current.bills,
+        qty: current.qty,
+        share: total > 0 ? Math.round((current.revenue / total) * 1000) / 10 : 0,
+        previousRevenue: roundMoney(previous),
+        changePct: changePct(current.revenue, previous),
+      };
+    });
+};
+
 const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 0) => {
   try {
     const [activeSubs, expiredSubs, custActive, currentSubs, prevSubs, allSubs, plans] = await Promise.all([
@@ -839,16 +909,23 @@ const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 
       .sort((a, b) => b.spend - a.spend || b.bills - a.bills)
       .slice(0, 20);
 
+    const currentTypes = tallyMembershipTypes(currentSubs, planDisplayMap);
+    const previousTypes = tallyMembershipTypes(prevSubs, planDisplayMap);
+    const types = formatMembershipTypes(currentTypes, previousTypes);
+    const soldQty = types.reduce((sum, row) => sum + row.qty, 0);
+
     return {
       revenue,
       previousRevenue,
       bills,
+      qty: soldQty,
       activeMembers,
       expiredMembers,
       topSellingMembership,
       topSellingCount: topPlanCount,
       topCustomers,
       payments: memPayments,
+      types,
     };
   } catch (err) {
     console.error('loadMembershipStats error:', err);
@@ -856,12 +933,23 @@ const loadMembershipStats = async (range, currentMemberRev = 0, prevMemberRev = 
       revenue: currentMemberRev,
       previousRevenue: prevMemberRev,
       bills: currentMemberRev > 0 ? 1 : 0,
+      qty: 0,
       activeMembers: 0,
       expiredMembers: 0,
       topSellingMembership: 'Standard',
       topSellingCount: 0,
       topCustomers: [],
       payments: createPaymentBucket(),
+      types: MEMBERSHIP_TYPE_DEFS.map(type => ({
+        key: type.key,
+        label: type.label,
+        revenue: 0,
+        bills: 0,
+        qty: 0,
+        share: 0,
+        previousRevenue: 0,
+        changePct: null,
+      })),
     };
   }
 };
@@ -927,13 +1015,19 @@ const buildInsights = async (range, filters) => {
     revenue: memStats.revenue,
     share: memShare,
     bills: memStats.bills,
-    qty: memStats.activeMembers,
+    qty: memStats.qty || 0,
     bookings: 0,
     hours: 0,
     average: memStats.bills > 0 ? roundMoney(memStats.revenue / memStats.bills) : 0,
     previousRevenue: memStats.previousRevenue,
     changePct: changePct(memStats.revenue, memStats.previousRevenue),
-    top: [{ name: memStats.topSellingMembership, qty: memStats.topSellingCount, revenue: memStats.revenue, orders: memStats.bills }],
+    top: (memStats.types || []).map(type => ({
+      name: type.label,
+      qty: type.qty,
+      revenue: type.revenue,
+      orders: type.bills,
+    })),
+    types: memStats.types || [],
     activeMembers: memStats.activeMembers,
     expiredMembers: memStats.expiredMembers,
     topSellingMembership: memStats.topSellingMembership,
@@ -1008,6 +1102,7 @@ const buildInsights = async (range, filters) => {
       activeMembers: memStats.activeMembers,
       expiredMembers: memStats.expiredMembers,
       topSellingMembership: memStats.topSellingMembership,
+      types: memStats.types || [],
     },
     top: pictured,
     topCustomers,

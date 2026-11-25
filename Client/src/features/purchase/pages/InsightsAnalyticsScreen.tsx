@@ -50,6 +50,7 @@ import {
   type InsightQuery,
   type InsightSegment,
   type InsightsPayload,
+  type MembershipTypeRow,
   type RankedCustomer,
   type RankedItem,
   type SegmentPayments,
@@ -99,6 +100,10 @@ const SEGMENT_COLOR: Record<string, string> = {
   space: "#6366f1",
   store: "#0d9488",
   membership: "#7c3aed",
+  premium: "#d97706",
+  special: "#2563eb",
+  junior: "#16a34a",
+  elite: "#9333ea",
 };
 const inr = (value: number) => `₹${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
 const pretty = (ymd?: string) => {
@@ -1026,6 +1031,41 @@ function SegmentCards({ segments }: { segments: InsightsPayload["segments"] }) {
   );
 }
 
+function MembershipRevenueLines({ types }: { types: MembershipTypeRow[] }) {
+  return (
+    <ul className="mt-3 space-y-1.5 border-t border-purple-100/80 pt-2.5">
+      {types.map((type) => (
+        <li key={type.key} className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ background: SEGMENT_COLOR[type.key] || "#7c3aed" }}
+            />
+            <span className="truncate font-semibold text-slate-700">{type.label}</span>
+          </span>
+          <span className="shrink-0 font-black text-slate-900">{inr(type.revenue)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MembershipBillLines({ types }: { types: MembershipTypeRow[] }) {
+  return (
+    <ul className="mt-3 space-y-1.5 border-t border-indigo-100/80 pt-2.5">
+      {types.map((type) => (
+        <li key={type.key} className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="truncate font-semibold text-slate-700">{type.label}</span>
+          <span className="shrink-0 font-bold text-slate-800">
+            {type.bills} {type.bills === 1 ? "bill" : "bills"} · {type.qty}{" "}
+            {type.qty === 1 ? "item" : "items"}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function RevenueSection({
   data,
   loading,
@@ -1079,7 +1119,7 @@ function RevenueSection({
     ? (effectiveSeg === "space"
         ? (currentSegment.hours ? `${currentSegment.hours} hrs` : `${currentSegment.bookings} bookings`)
         : effectiveSeg === "membership"
-        ? `${currentSegment.activeMembers ?? currentSegment.qty} members`
+        ? `${currentSegment.qty} sold`
         : `${currentSegment.qty} sold`)
     : `${data.segments.reduce((sum, s) => sum + (s.qty || 0), 0)} sold`;
 
@@ -1117,6 +1157,21 @@ function RevenueSection({
       color: "#94a3b8",
     },
   ];
+  const membershipTypes = currentSegment?.types || [];
+  const membershipDonut: DonutRow[] = membershipTypes.map((type) => ({
+    key: type.key,
+    name: type.label,
+    value: type.revenue,
+    share: type.share,
+    growth: type.changePct,
+    previousRevenue: type.previousRevenue,
+    color: SEGMENT_COLOR[type.key] || "#7c3aed",
+  }));
+  const breakdownDonut = effectiveSeg === "membership" ? membershipDonut : segmentDonut;
+  const breakdownTitle =
+    effectiveSeg === "membership"
+      ? "Membership Breakdown"
+      : `${currentSegment?.label || "Segment"} Breakdown`;
 
   return (
     <section className="space-y-3">
@@ -1152,6 +1207,7 @@ function RevenueSection({
                 <p className="mt-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                   {inr(totalRevenue)}
                 </p>
+                {effectiveSeg === "membership" ? <MembershipRevenueLines types={membershipTypes} /> : null}
               </div>
 
               <div className="mt-3 pt-2.5 border-t border-purple-100/80 flex items-center justify-between text-[11px] text-slate-500">
@@ -1205,6 +1261,7 @@ function RevenueSection({
                 </div>
               </div>
 
+              {effectiveSeg === "membership" ? <MembershipBillLines types={membershipTypes} /> : null}
               <div className="mt-3 pt-2.5 border-t border-indigo-100/80 flex items-center justify-between text-[11px] text-slate-500">
                 <span>Volume summary</span>
                 <span className="font-bold text-slate-800">
@@ -1215,13 +1272,13 @@ function RevenueSection({
 
             {/* Card 3: Segment Breakdown Card */}
             <DonutCard
-              title={`${currentSegment?.label || "Segment"} Breakdown`}
+              title={breakdownTitle}
               center={inr(currentSegment?.revenue || 0)}
               centerGrowth={currentSegment?.changePct ?? null}
-              centerLabel={`${currentSegment?.label || "Segment"}`}
-              rows={segmentDonut}
-              empty="No billed sales in this range."
-              theme={effectiveSeg === "food" ? "amber" : effectiveSeg === "space" ? "purple" : "amber"}
+              centerLabel={effectiveSeg === "membership" ? "Membership" : `${currentSegment?.label || "Segment"}`}
+              rows={breakdownDonut}
+              empty={effectiveSeg === "membership" ? "No membership sales in this range." : "No billed sales in this range."}
+              theme={effectiveSeg === "food" ? "amber" : "purple"}
               compact={true}
             />
           </div>
@@ -1251,6 +1308,7 @@ function RevenueSection({
                   <p className="mt-2.5 text-2xl font-black text-slate-900 tracking-tight">
                     {inr(totalRevenue)}
                   </p>
+                  {effectiveSeg === "membership" ? <MembershipRevenueLines types={membershipTypes} /> : null}
                 </div>
                 <div className="mt-2.5 pt-2 border-t border-purple-100/80 flex items-center justify-between text-[10px] text-slate-500">
                   <span>Growth vs previous</span>
@@ -1297,6 +1355,7 @@ function RevenueSection({
                   </div>
                 </div>
 
+                {effectiveSeg === "membership" ? <MembershipBillLines types={membershipTypes} /> : null}
                 <div className="mt-2.5 pt-2 border-t border-indigo-100/80 flex items-center justify-between text-[10px] text-slate-500">
                   <span>Volume summary</span>
                   <span className="font-bold text-slate-800">{totalBills} bills · {itemsSold}</span>
@@ -1307,12 +1366,12 @@ function RevenueSection({
             {/* Mobile Card 3 (Donut) */}
             <article className="rounded-2xl border border-purple-100/90 bg-white p-3.5 shadow-xs">
               <DonutBlock
-                title={`${currentSegment?.label || "Segment"} Breakdown`}
+                title={breakdownTitle}
                 center={inr(currentSegment?.revenue || 0)}
                 centerGrowth={currentSegment?.changePct ?? null}
-                centerLabel={`${currentSegment?.label || "Segment"}`}
-                rows={segmentDonut}
-                empty="No billed sales in this range."
+                centerLabel={effectiveSeg === "membership" ? "Membership" : `${currentSegment?.label || "Segment"}`}
+                rows={breakdownDonut}
+                empty={effectiveSeg === "membership" ? "No membership sales in this range." : "No billed sales in this range."}
               />
             </article>
           </div>
@@ -1449,6 +1508,7 @@ function DonutBlock({
   empty,
   activeKey,
   onSelectKey,
+  compact = false,
 }: {
   title: string;
   center: string;
@@ -1458,6 +1518,7 @@ function DonutBlock({
   empty: string;
   activeKey?: string;
   onSelectKey?: (key: string) => void;
+  compact?: boolean;
 }) {
   const pieData = rows.filter(row => row.value > 0);
   const totalValue = rows.reduce((sum, r) => sum + (r.value || 0), 0);
@@ -1481,10 +1542,22 @@ function DonutBlock({
         )}
       </div>
 
-      {rows.length === 0 || totalValue === 0 ? (
+      {rows.length === 0 ? (
         <p className="py-8 sm:py-16 text-center text-xs sm:text-sm text-slate-400">{empty}</p>
+      ) : totalValue === 0 ? (
+        <ul className="mt-3 space-y-1.5">
+          {rows.map(row => (
+            <li key={row.name} className="flex items-center justify-between gap-2 text-xs">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: row.color }} />
+                <span className="truncate font-bold text-slate-800">{row.name}</span>
+              </span>
+              <span className="font-black text-slate-900">{inr(0)}</span>
+            </li>
+          ))}
+        </ul>
       ) : (
-        <div className="mt-2 grid items-center gap-3 sm:grid-cols-[180px_1fr] md:grid-cols-[190px_1fr]">
+        <div className={`mt-2 grid items-center gap-3 ${compact ? "grid-cols-1" : "sm:grid-cols-[180px_1fr] md:grid-cols-[190px_1fr]"}`}>
           <div className="relative h-44 sm:h-48 mx-auto w-44 sm:w-48 shrink-0 flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -1568,12 +1641,12 @@ function DonutBlock({
                         : ""
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                    <div className="flex min-w-[6.5rem] flex-1 items-center gap-1.5 pr-1">
                       <span
                         className="h-2.5 w-2.5 rounded-full shrink-0"
                         style={{ background: row.color }}
                       />
-                      <span className="truncate font-bold text-slate-800 text-[11px] sm:text-xs">
+                      <span className="font-bold text-slate-800 text-[11px] sm:text-xs leading-tight">
                         {row.name}
                       </span>
                     </div>
@@ -1630,6 +1703,7 @@ function DonutCard({
   theme = "purple",
   activeKey,
   onSelectKey,
+  compact = false,
 }: {
   title: string;
   center: string;
@@ -1640,6 +1714,7 @@ function DonutCard({
   theme?: "amber" | "purple";
   activeKey?: string;
   onSelectKey?: (key: string) => void;
+  compact?: boolean;
 }) {
   const cardBorder = theme === "amber"
     ? "border-amber-100/90 bg-gradient-to-br from-amber-50/20 via-white to-purple-50/20"
@@ -1656,6 +1731,7 @@ function DonutCard({
         empty={empty}
         activeKey={activeKey}
         onSelectKey={onSelectKey}
+        compact={compact}
       />
     </article>
   );

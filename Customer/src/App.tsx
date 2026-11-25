@@ -1,4 +1,4 @@
-import {BrowserRouter, Navigate, Route, Routes} from 'react-router-dom';
+import {BrowserRouter, Navigate, Route, Routes, useLocation} from 'react-router-dom';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {Toaster} from 'sonner';
 import {
@@ -60,6 +60,18 @@ const queryClient = new QueryClient({
 function RootRedirect() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const customer = useAuthStore(s => s.customer);
+  const location = useLocation();
+  const publicProgram = location.pathname
+    .replace(/\/+$/, '')
+    .match(/^\/program\/(csp|hap|cvp)$/i);
+  if (publicProgram) {
+    return (
+      <Navigate
+        to={`/program/${publicProgram[1].toLowerCase()}`}
+        replace
+      />
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <Navigate to={getPostAuthPath(customer)} replace />;
 }
@@ -100,13 +112,9 @@ export default function App() {
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
                 {/* <Route path="/programs" element={<ProgramsPage />} /> */}
                 <Route path="/program/cap" element={<ProgramsPage />} />
-                <Route path="/ourprograms" element={<OurProgramsPage />} />
-                <Route path="/ourprograms/:tab" element={<OurProgramsPage />} />
-                <Route path="/program/csp" element={<ProgramsPage />} />
-                <Route path="/program/cvp" element={<CvpProgramPage />} />
-                <Route path="/program/hap" element={<HapProgramPage />} />
-                <Route path="/program/:tab" element={<OurProgramsPage />} />
-                <Route path="/programs/:tab" element={<OurProgramsPage />} />
+                <Route path="/program/csp/dashboard" element={<ProgramsPage />} />
+                <Route path="/program/cvp/dashboard" element={<CvpProgramPage />} />
+                <Route path="/program/hap/dashboard" element={<HapProgramPage />} />
                 <Route path="/booking" element={<MyBookingsPage />} />
                 <Route path="/bookings" element={<Navigate to="/booking" replace />} />
                 <Route path="/csp-program" element={<CspProgramPage />} />
@@ -141,10 +149,13 @@ export default function App() {
             <Route path="/exclusive" element={<Navigate to="/spaces/exclusive" replace />} />
             <Route path="/coworking" element={<Navigate to="/spaces/coworking" replace />} />
             <Route path="/programs" element={<ProgramsPage />} />
-            <Route path="/program" element={<ProgramsPage />} />
-            <Route path="/program/csp" element={<ProgramsPage />} />
-            <Route path="/program/cvp" element={<CvpProgramPage />} />
-            <Route path="/program/hap" element={<HapProgramPage />} />
+            <Route path="/program" element={<OurProgramsPage />} />
+            <Route path="/program/csp" element={<OurProgramsPage defaultTab="csp" />} />
+            <Route path="/program/csp/" element={<OurProgramsPage defaultTab="csp" />} />
+            <Route path="/program/cvp" element={<OurProgramsPage defaultTab="cvp" />} />
+            <Route path="/program/cvp/" element={<OurProgramsPage defaultTab="cvp" />} />
+            <Route path="/program/hap" element={<OurProgramsPage defaultTab="hap" />} />
+            <Route path="/program/hap/" element={<OurProgramsPage defaultTab="hap" />} />
             <Route path="/ourprograms" element={<OurProgramsPage />} />
             <Route path="/ourprograms/:tab" element={<OurProgramsPage />} />
             <Route path="/program/:tab" element={<OurProgramsPage />} />
