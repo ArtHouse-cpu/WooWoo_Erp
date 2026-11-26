@@ -46,6 +46,7 @@ import SpacesMarketplacePage from './app/spaces/SpacesMarketplacePage';
 import PublicSpacePage from './app/spaces/PublicSpacePage';
 import CvpProgramPage from './app/programs/CvpProgramPage';
 import HapProgramPage from './app/programs/HapProgramPage';
+import FoodMenuPage from './app/woofoo/FoodMenuPage';
 
 
 const queryClient = new QueryClient({
@@ -141,6 +142,9 @@ export default function App() {
             <Route path="/refundterms" element={<RefundTermsPage />} />
             <Route path="/help" element={< HelpScreen/>} />
             <Route path="/exhibition" element={<ExhibitionPage />} />
+            <Route path="/woofoo/menu" element={<FoodMenuPage />} />
+            <Route path="/food-menu" element={<FoodMenuPage />} />
+            <Route path="/menu" element={<FoodMenuPage />} />
             <Route path="/supplies/product/:id" element={<PublicProductPage />} />
             <Route path="/spaces" element={<SpacesMarketplacePage />} />
             <Route path="/spaces/exclusive" element={<SpacesMarketplacePage initialType="Exclusive" />} />

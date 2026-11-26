@@ -59,7 +59,7 @@ export default function HomePage() {
   };
 
   const handleExploreClick = (id: string) => {
-    if (id === 'store') {
+    if (id === 'store' || id === 'supplies') {
       setSuppliesOpen(true);
     } else if (id === 'services') {
       setServicesOpen(true);

@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import {useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
-import {Calendar, ChevronLeft, Gift, Mail, Trash2, User} from 'lucide-react';
+import {Calendar, ChevronLeft, Gift, LogOut, Mail, User} from 'lucide-react';
 import {toast} from 'sonner';
 import Swal from 'sweetalert2';
 import {Button} from '../../components/ui/Button';
@@ -74,7 +74,6 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const {customer, setCustomer, logout} = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const isDesktop = useIsDesktop();
 
   const form = useForm<FormValues>({
@@ -117,39 +116,26 @@ export default function ProfilePage() {
     }
   });
 
-  const onDeleteProfile = async () => {
+  const onLogout = async () => {
     const result = await Swal.fire({
-      title: 'Delete profile?',
-      text: 'This will permanently delete your account. This cannot be undone.',
-      icon: 'warning',
+      title: 'Log out?',
+      text: 'Are you sure you want to log out?',
+      icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Yes, delete',
+      confirmButtonText: 'Yes, log out',
       cancelButtonText: 'Cancel',
-      confirmButtonColor: '#DC2626',
+      confirmButtonColor: '#EF4444',
       cancelButtonColor: '#9CA3AF',
     });
     if (!result.isConfirmed) return;
 
-    setDeleting(true);
     try {
-      await authApi.deleteProfile();
-      logout();
-      await Swal.fire({
-        icon: 'success',
-        title: 'Profile deleted',
-        timer: 1500,
-        showConfirmButton: false,
-      });
-      navigate('/login', {replace: true});
-    } catch (error) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Could not delete profile',
-        text: getErrorMessage(error, 'Please try again'),
-      });
-    } finally {
-      setDeleting(false);
+      await authApi.logout();
+    } catch {
+      // ignore
     }
+    logout();
+    navigate('/login', {replace: true});
   };
 
   const initial = (customer?.name || 'C').charAt(0).toUpperCase();
@@ -161,17 +147,7 @@ export default function ProfilePage() {
         loading={loading}
         className="rounded-[14px] bg-[#111111] py-[15px] text-[15px] font-semibold hover:bg-black"
       >
-        Save Profile
-      </Button>
-      <Button
-        type="button"
-        variant="danger"
-        loading={deleting}
-        onClick={onDeleteProfile}
-        className="rounded-[14px] py-[15px] text-[15px] font-semibold"
-      >
-        <Trash2 className="h-4 w-4" />
-        Delete Profile
+        Update Profile
       </Button>
     </div>
   );
@@ -263,7 +239,7 @@ const profileFields = (
   if (!isDesktop) {
     return (
       <div className="min-h-dvh bg-white px-5 pb-10 pt-6">
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -271,6 +247,15 @@ const profileFields = (
             aria-label="Go back"
           >
             <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+          </button>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-red-100 bg-white text-[#EF4444] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 hover:bg-red-50 hover:border-red-200 cursor-pointer"
+            aria-label="Logout"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={2} />
           </button>
         </div>
         <div className="mb-6 flex items-center gap-3.5">
@@ -312,7 +297,7 @@ const profileFields = (
     <div className="brush-bg min-h-screen px-4 py-8 sm:px-8">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <div className="auth-card rounded-[28px] border border-white/80 p-6 sm:p-8">
-          <div className="mb-5">
+          <div className="mb-5 flex items-center justify-between">
             <button
               type="button"
               onClick={() => navigate(-1)}
@@ -320,6 +305,15 @@ const profileFields = (
               aria-label="Go back"
             >
               <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+            </button>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-red-100 bg-white text-[#EF4444] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 hover:bg-red-50 hover:border-red-200 cursor-pointer"
+              aria-label="Logout"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" strokeWidth={2} />
             </button>
           </div>
           <div className="mb-6 flex items-center gap-4">

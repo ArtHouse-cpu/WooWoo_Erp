@@ -1,6 +1,6 @@
 import {useState, useEffect} from 'react';
-import {Link, useLocation} from 'react-router-dom';
-import {ChevronRight, Crown, User, X} from 'lucide-react';
+import {Link, useLocation, useNavigate} from 'react-router-dom';
+import {ChevronRight, Crown, LogOut, User, X} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {BrandMark} from '../auth/AuthShell';
 import {dashboardNav} from '../../data/dashboard';
@@ -16,9 +16,23 @@ type Props = {
 
 export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgramsClick}: Props) {
   const location = useLocation();
+  const navigate = useNavigate();
   const customer = useAuthStore(s => s.customer);
+  const logout = useAuthStore(s => s.logout);
+  const isPremium = String(customer?.membershipType || '').trim().toLowerCase() === 'premium';
   const storeBalance = Number(customer?.walletBalance ?? customer?.walletAmount ?? 0);
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // ignore
+    }
+    logout();
+    onClose?.();
+    navigate('/login', {replace: true});
+  };
 
   useEffect(() => {
     let active = true;
@@ -169,23 +183,8 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
         })}
       </nav>
 
-      <div className="space-y-3 px-4 pb-5">
-        <div className="rounded-[20px] bg-gradient-to-br from-[#8B5CF6] via-[#6366F1] to-[#2563EB] p-4 text-white shadow-lg">
-          <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
-            <Crown className="h-4 w-4" />
-          </div>
-          <p className="text-[14px] font-bold">Upgrade Membership</p>
-          <p className="mt-1 text-[11px] leading-snug text-white/85">
-            Unlock exclusive benefits & grow your art journey
-          </p>
-          <Link
-            to="/membership"
-            onClick={onClose}
-            className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-white py-2.5 text-[13px] font-semibold text-[#4F46E5]"
-          >
-            Upgrade Now
-          </Link>
-        </div>
+      <div className="space-y-2.5 px-4 pb-4">
+        {/* My Profile Button shifted above Membership card */}
         <Link
           to="/profile"
           onClick={onClose}
@@ -205,6 +204,36 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
             }`}
           />
         </Link>
+
+        {/* Upgrade Membership Card (hidden if already premium) */}
+        {!isPremium && (
+          <div className="rounded-[20px] bg-gradient-to-br from-[#8B5CF6] via-[#6366F1] to-[#2563EB] p-4 text-white shadow-lg">
+            <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
+              <Crown className="h-4 w-4" />
+            </div>
+            <p className="text-[14px] font-bold">Upgrade Membership</p>
+            <p className="mt-1 text-[11px] leading-snug text-white/85">
+              Unlock exclusive benefits &amp; grow your art journey
+            </p>
+            <Link
+              to="/membership"
+              onClick={onClose}
+              className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-white py-2.5 text-[13px] font-semibold text-[#4F46E5] hover:bg-white/95 transition"
+            >
+              Upgrade Now
+            </Link>
+          </div>
+        )}
+
+        {/* Logout Button below Upgrade Membership card */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white py-2.5 px-3.5 text-[13px] font-semibold text-red-600 hover:bg-red-50 hover:border-red-300 transition cursor-pointer"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Logout</span>
+        </button>
       </div>
     </div>
   );

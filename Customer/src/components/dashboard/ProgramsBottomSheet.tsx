@@ -550,7 +550,6 @@ export function ProgramsBottomSheet({
 }: ProgramsBottomSheetProps) {
   const navigate = useNavigate();
   const customer = useAuthStore((state) => state.customer);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { isPremium } = useMembership();
   const { application, loaded: cspLoaded, refresh: refreshCsp } = useCspApplication();
   const { application: hapApplication, loaded: hapLoaded, refresh: refreshHap } = useHapApplication();
@@ -1007,14 +1006,14 @@ export function ProgramsBottomSheet({
                   </div>
                 </div>
 
-                {asPage && !isAuthenticated ? (
+                {asPage || activeTab === "csp" || activeTab === "hap" || activeTab === "cvp" ? (
                   <button
                     type="button"
                     onClick={onClose}
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0A0F1D] px-3.5 py-2 text-[12.5px] font-extrabold text-white transition hover:bg-[#1B2438] cursor-pointer"
                   >
                     <Home className="h-4 w-4" strokeWidth={2.4} />
-                    <span>Return to home</span>
+                    <span>Home</span>
                   </button>
                 ) : (
                   <button
@@ -1359,48 +1358,39 @@ export function ProgramsBottomSheet({
                       ) : activeTab === "hap" ? (
                         <>
                           {/* Stat 1 */}
-                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F5F3FF] border border-[#EDE9FE] text-center">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EDE9FE] text-[#7C3AED] mb-2">
-                              <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
+                          <div className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-2xl bg-[#F5F3FF] border border-[#EDE9FE] text-center min-w-0">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EDE9FE] text-[#7C3AED] mb-2 shrink-0">
+                              <IndianRupee className="h-4.5 w-4.5" strokeWidth={2.25} />
                             </div>
-                            <div className="text-[13px] font-black text-slate-900 leading-none">
-                              50+
+                            <div className="w-full text-center text-[9.5px] min-[360px]:text-[10.5px] sm:text-[12.5px] font-black text-slate-900 leading-none whitespace-nowrap tracking-tight">
+                              Zero Investment
                             </div>
-                            <div className="mt-1 text-[8.5px] font-extrabold text-[#4C1D95] leading-tight">
-                              Active Affiliates
-                            </div>
-                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
-                              Growing every day
+                            <div className="mt-1 text-[7.5px] sm:text-[8px] font-bold text-slate-400 leading-tight">
+                              Start free with no joining fee
                             </div>
                           </div>
                           {/* Stat 2 */}
-                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2">
-                              <IndianRupee className="h-4.5 w-4.5" strokeWidth={2.25} />
+                          <div className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center min-w-0">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2 shrink-0">
+                              <TrendingUp className="h-4.5 w-4.5" strokeWidth={2.25} />
                             </div>
-                            <div className="text-[13px] font-black text-slate-900 leading-none">
-                              ₹25 Lakhs+
+                            <div className="w-full text-center text-[8.5px] min-[360px]:text-[9px] min-[390px]:text-[10px] sm:text-[12px] font-black text-slate-900 leading-none whitespace-nowrap tracking-tight">
+                              20% Commission (upto)
                             </div>
-                            <div className="mt-1 text-[8.5px] font-extrabold text-[#14532D] leading-tight">
-                              Commission Gen
-                            </div>
-                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
-                              From affiliate earnings
+                            <div className="mt-1 text-[7.5px] sm:text-[8px] font-bold text-slate-400 leading-tight">
+                              Earn up to 20% on bookings
                             </div>
                           </div>
                           {/* Stat 3 */}
-                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2">
-                              <Target className="h-4.5 w-4.5" strokeWidth={2.25} />
+                          <div className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center min-w-0">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2 shrink-0">
+                              <Calendar className="h-4.5 w-4.5" strokeWidth={2.25} />
                             </div>
-                            <div className="text-[13px] font-black text-slate-900 leading-none">
-                              5K+
+                            <div className="w-full text-center text-[9.5px] min-[360px]:text-[10.5px] sm:text-[12.5px] font-black text-slate-900 leading-none whitespace-nowrap tracking-tight">
+                              Weekly Payout
                             </div>
-                            <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
-                              Leads Driven
-                            </div>
-                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
-                              By our affiliates
+                            <div className="mt-1 text-[7.5px] sm:text-[8px] font-bold text-slate-400 leading-tight">
+                              Get paid directly every single week
                             </div>
                           </div>
                         </>

@@ -116,8 +116,8 @@ function isTxInTimeframe(dateStr?: string | null, timeframe: WalletTimeframe = '
   }
 
   if (timeframe === 'yesterday') {
-    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
-    const endOfYesterday = startOfToday - 1;
+    const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0).getTime();
+    const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999).getTime();
     return txTime >= startOfYesterday && txTime <= endOfYesterday;
   }
 
@@ -130,7 +130,8 @@ function isTxInTimeframe(dateStr?: string | null, timeframe: WalletTimeframe = '
 
   if (timeframe === 'month') {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
-    return txTime >= startOfMonth && txTime <= endOfToday;
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+    return txTime >= startOfMonth && txTime <= endOfMonth;
   }
 
   return true;
@@ -146,6 +147,16 @@ export default function WalletPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const handleSelectTimeframe = (
+    e: React.MouseEvent | React.TouchEvent,
+    optionId: WalletTimeframe,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTimeframe(optionId);
+    setDropdownOpen(false);
+  };
+
   useEffect(() => {
     if (!dropdownOpen) return;
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
@@ -157,11 +168,11 @@ export default function WalletPage() {
       if (e.key === 'Escape') setDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('touchend', handleClickOutside);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('touchend', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [dropdownOpen]);
@@ -311,13 +322,13 @@ export default function WalletPage() {
   const affiliateStats = useMemo(() => {
     if (!data) return [];
 
-    let earningsValue = data.affiliateThisMonth.earnings;
-    let referralsValue = data.affiliateThisMonth.referrals;
-    let revenueValue = data.affiliateThisMonth.revenue;
-    const conversionValue = `${data.affiliateThisMonth.conversionRate}%`;
+    let earningsValue = data.affiliateThisMonth?.earnings ?? 0;
+    let referralsValue = data.affiliateThisMonth?.referrals ?? 0;
+    let revenueValue = data.affiliateThisMonth?.revenue ?? 0;
+    const conversionValue = `${data.affiliateThisMonth?.conversionRate ?? 0}%`;
 
     if (timeframe === 'lifetime') {
-      earningsValue = data.summary.totalAffiliateEarned || data.affiliateThisMonth.earnings;
+      earningsValue = data.summary?.totalAffiliateEarned || data.affiliateThisMonth?.earnings || 0;
     } else if (timeframe !== 'month') {
       const credits = filteredTransactions.filter(
         tx =>
@@ -640,10 +651,13 @@ export default function WalletPage() {
             </div>
 
             {/* Timeframe Filter Dropdown */}
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative z-50" ref={dropdownRef}>
               <button
                 type="button"
-                onClick={() => setDropdownOpen(prev => !prev)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDropdownOpen(prev => !prev);
+                }}
                 className={`flex items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl border px-3 py-1.5 text-xs font-bold transition cursor-pointer shadow-2xs ${
                   timeframe !== 'lifetime'
                     ? 'border-[#EA580C]/40 bg-orange-50/70 text-[#EA580C] hover:bg-orange-100/70'
@@ -662,7 +676,7 @@ export default function WalletPage() {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 top-full mt-1.5 z-30 w-44 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50">
                   <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Select Timeframe
                   </div>
@@ -672,10 +686,9 @@ export default function WalletPage() {
                       <button
                         key={option.id}
                         type="button"
-                        onClick={() => {
-                          setTimeframe(option.id);
-                          setDropdownOpen(false);
-                        }}
+                        onMouseDown={(e) => handleSelectTimeframe(e, option.id)}
+                        onTouchEnd={(e) => handleSelectTimeframe(e, option.id)}
+                        onClick={(e) => handleSelectTimeframe(e, option.id)}
                         className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-bold transition cursor-pointer ${
                           isSelected
                             ? 'bg-orange-50 text-[#EA580C]'
