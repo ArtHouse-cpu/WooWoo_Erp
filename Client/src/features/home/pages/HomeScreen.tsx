@@ -17,7 +17,9 @@ import {
   Monitor,
   MoreVertical,
   Package,
+  Minus,
   Phone,
+  Plus,
   Search,
   Share2,
   ShoppingCart,
@@ -29,7 +31,6 @@ import {
   UserPlus,
   Users,
   Utensils,
-  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -712,6 +713,7 @@ export default function HomeScreen() {
     id: string;
     name: string;
     phone?: string;
+    mode: "credit" | "debit";
   } | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
   const [invoiceRefresh, setInvoiceRefresh] = useState(0);
@@ -3824,14 +3826,15 @@ export default function HomeScreen() {
                         )}
 
                         {/* 3-Dots Action Menu */}
-                        <div className="relative shrink-0">
+                        <div className="relative z-[80] shrink-0">
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={(event) => {
+                              event.stopPropagation();
                               setActionMenuCustomerId(
                                 actionMenuCustomerId === c.id ? null : c.id
-                              )
-                            }
+                              );
+                            }}
                             className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition active:scale-95 cursor-pointer"
                             aria-label="Customer actions"
                           >
@@ -3841,10 +3844,17 @@ export default function HomeScreen() {
                           {actionMenuCustomerId === c.id && (
                             <>
                               <div
-                                className="fixed inset-0 z-30"
-                                onClick={() => setActionMenuCustomerId(null)}
+                                className="fixed inset-0 z-[70]"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setActionMenuCustomerId(null);
+                                }}
                               />
-                              <div className="absolute right-0 top-full z-40 mt-1.5 w-48 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                              <div
+                                className="absolute right-0 top-full z-[80] mt-1.5 w-48 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl"
+                                onClick={(event) => event.stopPropagation()}
+                                onMouseDown={(event) => event.stopPropagation()}
+                              >
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -3869,21 +3879,46 @@ export default function HomeScreen() {
                                   <span>Edit Customer</span>
                                 </button>
                                 {can(PERMISSIONS.WALLET_MANAGE) ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActionMenuCustomerId(null);
-                                      setWalletCustomer({
-                                        id: customerId,
-                                        name: c.name,
-                                        phone: hasPhone ? phoneNum : "",
-                                      });
-                                    }}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-                                  >
-                                    <Wallet size={14} className="text-violet-500" />
-                                    <span>Add / Deduct wallet</span>
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(event) => event.stopPropagation()}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        setActionMenuCustomerId(null);
+                                        setWalletCustomer({
+                                          id: customerId,
+                                          name: c.name,
+                                          phone: hasPhone ? phoneNum : "",
+                                          mode: "credit",
+                                        });
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 cursor-pointer"
+                                    >
+                                      <Plus size={14} className="text-emerald-600" />
+                                      <span>Add in wallet</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(event) => event.stopPropagation()}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        setActionMenuCustomerId(null);
+                                        setWalletCustomer({
+                                          id: customerId,
+                                          name: c.name,
+                                          phone: hasPhone ? phoneNum : "",
+                                          mode: "debit",
+                                        });
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                    >
+                                      <Minus size={14} className="text-rose-500" />
+                                      <span>Deduct from wallet</span>
+                                    </button>
+                                  </>
                                 ) : null}
                                 <button
                                   type="button"
@@ -4098,6 +4133,7 @@ export default function HomeScreen() {
       {walletCustomer ? (
         <WalletAdjustModal
           customer={walletCustomer}
+          mode={walletCustomer.mode}
           createdBy={{
             m_staff_id: staff?.m_staff_id,
             m_staff_name: staff?.m_staff_name,

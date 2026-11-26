@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Minus, Plus, Wallet, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Wallet, X } from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleGetWalletById,
@@ -15,6 +16,7 @@ type WalletAdjustCustomer = {
 
 type WalletAdjustModalProps = {
   customer: WalletAdjustCustomer;
+  mode: "credit" | "debit";
   onClose: () => void;
   onSaved: () => void | Promise<void>;
   createdBy?: {
@@ -29,11 +31,11 @@ const money = (value: number) =>
 
 export default function WalletAdjustModal({
   customer,
+  mode,
   onClose,
   onSaved,
   createdBy,
 }: WalletAdjustModalProps) {
-  const [mode, setMode] = useState<"credit" | "debit">("credit");
   const [walletType, setWalletType] = useState<"nonWithdrawable" | "withdrawable">(
     "nonWithdrawable",
   );
@@ -129,8 +131,8 @@ export default function WalletAdjustModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
       <button
         type="button"
         aria-label="Close wallet modal"
@@ -150,7 +152,7 @@ export default function WalletAdjustModal({
             </span>
             <div>
               <h2 id="wallet-adjust-title" className="text-base font-bold text-slate-900">
-                Add / Deduct wallet
+                {mode === "credit" ? "Add in wallet" : "Deduct from wallet"}
               </h2>
               <p className="text-xs text-slate-500">{customer.name || "Customer"}</p>
             </div>
@@ -188,29 +190,6 @@ export default function WalletAdjustModal({
               {loadingBalance ? "…" : money(nonWithdrawable)}
             </p>
           </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
-          <button
-            type="button"
-            onClick={() => setMode("credit")}
-            className={`inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold ${
-              mode === "credit" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"
-            }`}
-          >
-            <Plus size={14} />
-            Add
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("debit")}
-            className={`inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold ${
-              mode === "debit" ? "bg-white text-rose-600 shadow-sm" : "text-slate-500"
-            }`}
-          >
-            <Minus size={14} />
-            Deduct
-          </button>
         </div>
 
         {mode === "credit" ? (
@@ -281,6 +260,7 @@ export default function WalletAdjustModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
