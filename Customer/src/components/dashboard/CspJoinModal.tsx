@@ -432,7 +432,7 @@ export function CspJoinModal({ isOpen, onClose, onSubmitted }: CspJoinModalProps
               )}
               {existing?.status === 'approved' && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                  Your application is approved. Open CSP Program from the sidebar.
+                  Your application is approved.
                 </div>
               )}
 
