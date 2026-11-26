@@ -1,10 +1,9 @@
 import {useState, useEffect} from 'react';
 import {Link, useLocation} from 'react-router-dom';
-import {ChevronRight, Crown, Store, User, X} from 'lucide-react';
+import {ChevronRight, Crown, User, X} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {BrandMark} from '../auth/AuthShell';
 import {dashboardNav} from '../../data/dashboard';
-import {useCspApplication} from '../../hooks/useCspApplication';
 import {useAuthStore} from '../../store/authStore';
 import {authApi} from '../../services/auth.service';
 
@@ -17,7 +16,6 @@ type Props = {
 
 export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgramsClick}: Props) {
   const location = useLocation();
-  const {application} = useCspApplication();
   const customer = useAuthStore(s => s.customer);
   const storeBalance = Number(customer?.walletBalance ?? customer?.walletAmount ?? 0);
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
@@ -62,16 +60,6 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
         {sections.map(section => {
           const items = dashboardNav.filter(i => i.section === section);
-          if (section === 'Main' && application?.status === 'approved') {
-            const programIndex = items.findIndex(item => item.id === 'programs');
-            items.splice(programIndex + 1, 0, {
-              id: 'csp-program',
-              label: 'CSP Program',
-              icon: Store,
-              to: '/csp-program',
-              section: 'Main',
-            });
-          }
           if (!items.length) return null;
           return (
             <div key={section} className="mb-4">

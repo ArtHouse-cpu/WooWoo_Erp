@@ -55,21 +55,21 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
       title: 'Watercolor Painting Workshop',
       category: 'Workshop',
       location: 'Bangalore, Karnataka',
-      image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=300&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/video/upload/v1795612541/IMG_1319.mov',
     },
     {
       id: '2',
       title: 'Contemporary Art Exhibition',
       category: 'Exhibition',
       location: 'Mumbai, Maharashtra',
-      image: 'https://images.unsplash.com/photo-1499783300057-475a43b27b6a?auto=format&fit=crop&w=300&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795611856/IMG_4907.heic',
     },
     {
       id: '3',
       title: 'Live Dance Performance',
       category: 'Show',
       location: 'Delhi, NCR',
-      image: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=300&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/video/upload/v1795612101/IMG_8169.mov',
     },
     {
       id: '4',
@@ -90,7 +90,7 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
       title: 'Artists Networking Meetup',
       category: 'Meetup',
       location: 'Bangalore, Karnataka',
-      image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=300&q=80',
+      image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795613541/IMG_4131.png',
     },
   ];
 
@@ -132,14 +132,14 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
         title: 'Live Dance Performance',
         category: 'Show',
         location: 'Delhi, NCR',
-        image: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=300&q=80',
+        image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795617288/Screenshot_2026-11-25_200403.png',
       },
       {
         id: '5',
         title: 'Acoustic Music Evening',
         category: 'Show',
         location: 'Hyderabad, Telangana',
-        image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&w=300&q=80',
+        image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795617457/music_night.png',
       },
       {
         id: 's3',
@@ -162,7 +162,7 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
         title: 'Artists Networking Meetup',
         category: 'Meetup',
         location: 'Bangalore, Karnataka',
-        image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=300&q=80',
+        image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795613541/IMG_4131.png',
       },
       {
         id: 'm2',

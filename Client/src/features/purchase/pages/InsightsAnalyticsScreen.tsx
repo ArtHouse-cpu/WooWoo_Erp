@@ -1128,9 +1128,9 @@ function RevenueSection({
       {segment !== "all" ? (
         <>
           {/* WEB VIEW: ALL THREE IN ONE ROW */}
-          <div className="hidden sm:grid sm:grid-cols-3 gap-2.5 sm:gap-3 items-stretch">
+          <div className="hidden sm:grid sm:grid-cols-3 gap-2.5 sm:gap-3 items-stretch min-w-0">
             {/* Card 1: Revenue Overview Card */}
-            <article className="flex flex-col justify-between rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/30 p-3.5 sm:p-4 shadow-xs">
+            <article className="flex flex-col justify-between rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/30 p-3.5 sm:p-4 shadow-xs min-w-0">
               <div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1164,7 +1164,7 @@ function RevenueSection({
             </article>
 
             {/* Card 2: New Card for Bills */}
-            <article className="flex flex-col justify-between rounded-2xl border border-indigo-200/90 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 p-3.5 sm:p-4 shadow-xs">
+            <article className="flex flex-col justify-between rounded-2xl border border-indigo-200/90 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 p-3.5 sm:p-4 shadow-xs min-w-0">
               <div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1449,6 +1449,7 @@ function DonutBlock({
   empty,
   activeKey,
   onSelectKey,
+  compact = false,
 }: {
   title: string;
   center: string;
@@ -1458,17 +1459,20 @@ function DonutBlock({
   empty: string;
   activeKey?: string;
   onSelectKey?: (key: string) => void;
+  compact?: boolean;
 }) {
   const pieData = rows.filter(row => row.value > 0);
   const totalValue = rows.reduce((sum, r) => sum + (r.value || 0), 0);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h3>
+    <div className="min-w-0">
+      <div className="flex items-center justify-between mb-1 gap-1">
+        <h3 className={`font-bold text-slate-900 truncate ${compact ? "text-xs" : "text-xs sm:text-sm"}`}>{title}</h3>
         {centerGrowth !== undefined && (
           <span
-            className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+            className={`hidden sm:inline-flex items-center gap-1 rounded-full font-bold border shrink-0 ${
+              compact ? "px-1.5 py-0.2 text-[9px]" : "px-2 py-0.5 text-[10px]"
+            } ${
               centerGrowth == null
                 ? "bg-purple-50 text-purple-700 border-purple-200"
                 : centerGrowth >= 0
@@ -1484,17 +1488,23 @@ function DonutBlock({
       {rows.length === 0 || totalValue === 0 ? (
         <p className="py-8 sm:py-16 text-center text-xs sm:text-sm text-slate-400">{empty}</p>
       ) : (
-        <div className="mt-2 grid items-center gap-3 sm:grid-cols-[180px_1fr] md:grid-cols-[190px_1fr]">
-          <div className="relative h-44 sm:h-48 mx-auto w-44 sm:w-48 shrink-0 flex items-center justify-center">
+        <div className={`mt-2 grid items-center min-w-0 ${
+          compact
+            ? "gap-2 grid-cols-[100px_minmax(0,1fr)] sm:grid-cols-[110px_minmax(0,1fr)]"
+            : "gap-3 sm:grid-cols-[180px_1fr] md:grid-cols-[190px_1fr]"
+        }`}>
+          <div className={`relative mx-auto shrink-0 flex items-center justify-center ${
+            compact ? "h-26 w-26 sm:h-28 sm:w-28" : "h-44 sm:h-48 w-44 sm:w-48"
+          }`}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={pieData}
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={48}
-                  outerRadius={68}
-                  paddingAngle={pieData.length > 1 ? 3 : 0}
+                  innerRadius={compact ? 26 : 48}
+                  outerRadius={compact ? 40 : 68}
+                  paddingAngle={pieData.length > 1 ? (compact ? 2 : 3) : 0}
                   stroke="none"
                 >
                   {pieData.map(row => (
@@ -1518,16 +1528,22 @@ function DonutBlock({
                 />
               </PieChart>
             </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center p-1">
-              <span className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center p-0.5">
+              <span className={`font-bold uppercase tracking-wider text-slate-400 leading-none ${
+                compact ? "text-[6.5px] sm:text-[7px]" : "text-[8.5px] sm:text-[9.5px]"
+              }`}>
                 {centerLabel}
               </span>
-              <span className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
+              <span className={`font-black text-slate-900 leading-tight ${
+                compact ? "text-[10px] sm:text-[11px] my-0.5" : "text-xs sm:text-sm my-0.5"
+              }`}>
                 {center}
               </span>
               {centerGrowth !== undefined && (
                 <span
-                  className={`mt-0.5 inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-extrabold ${
+                  className={`inline-flex items-center rounded-full font-extrabold ${
+                    compact ? "px-1 py-0 text-[7px]" : "px-1.5 py-0.2 text-[9px] sm:text-[10px]"
+                  } ${
                     centerGrowth == null
                       ? "text-purple-700 bg-purple-50"
                       : centerGrowth >= 0
@@ -1541,14 +1557,16 @@ function DonutBlock({
             </div>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 overflow-hidden">
             {/* Header: Segment | Total | Growth | % of Sale */}
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 pb-1.5 border-b border-slate-100/90 mb-1">
-              <span>Segment</span>
-              <div className="flex items-center gap-2 sm:gap-3 text-right">
-                <span className="w-16 sm:w-20 text-right">Total</span>
-                <span className="w-12 sm:w-14 text-center">Growth</span>
-                <span className="w-14 sm:w-16 text-right">% of Sale</span>
+            <div className={`flex items-center justify-between font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100/90 mb-1 ${
+              compact ? "text-[8px] sm:text-[8.5px] px-1 pb-1" : "text-[10px] px-2 pb-1.5"
+            }`}>
+              <span className="truncate">Segment</span>
+              <div className={`flex items-center text-right shrink-0 ${compact ? "gap-1 sm:gap-1.5" : "gap-2 sm:gap-3"}`}>
+                <span className={compact ? "w-11 sm:w-13 text-right" : "w-16 sm:w-20 text-right"}>Total</span>
+                <span className={compact ? "w-8 sm:w-10 text-center" : "w-12 sm:w-14 text-center"}>Growth</span>
+                <span className={compact ? "w-7 sm:w-9 text-right" : "w-14 sm:w-16 text-right"}>% Sale</span>
               </div>
             </div>
 
@@ -1560,7 +1578,9 @@ function DonutBlock({
                   <li
                     key={row.name}
                     onClick={() => row.key && onSelectKey?.(row.key)}
-                    className={`flex items-center justify-between gap-1 rounded-xl px-2 py-1.5 transition text-xs ${
+                    className={`flex items-center justify-between gap-1 rounded-xl transition ${
+                      compact ? "px-1 py-1 text-[11px]" : "px-2 py-1.5 text-xs"
+                    } ${
                       isSelected
                         ? "bg-purple-100/70 border border-purple-200 ring-1 ring-purple-300"
                         : onSelectKey && row.key
@@ -1568,27 +1588,31 @@ function DonutBlock({
                         : ""
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                    <div className="flex items-center gap-1 min-w-0 pr-1">
                       <span
-                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        className={`rounded-full shrink-0 ${compact ? "h-2 w-2" : "h-2.5 w-2.5"}`}
                         style={{ background: row.color }}
                       />
-                      <span className="truncate font-bold text-slate-800 text-[11px] sm:text-xs">
+                      <span className={`truncate font-bold text-slate-800 ${compact ? "text-[10px] sm:text-[10.5px]" : "text-[11px] sm:text-xs"}`}>
                         {row.name}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <div className={`flex items-center shrink-0 ${compact ? "gap-1 sm:gap-1.5" : "gap-2 sm:gap-3"}`}>
                       {/* Total */}
-                      <span className="w-16 sm:w-20 text-right font-black text-slate-900 text-[11px] sm:text-xs">
+                      <span className={`text-right font-black text-slate-900 ${
+                        compact ? "w-11 sm:w-13 text-[10px] sm:text-[10.5px]" : "w-16 sm:w-20 text-[11px] sm:text-xs"
+                      }`}>
                         {inr(row.value)}
                       </span>
 
                       {/* Growth */}
-                      <div className="w-12 sm:w-14 flex justify-center">
+                      <div className={`flex justify-center ${compact ? "w-8 sm:w-10" : "w-12 sm:w-14"}`}>
                         {row.growth !== undefined ? (
                           <span
-                            className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[9.5px] sm:text-[10px] font-extrabold border ${
+                            className={`inline-flex items-center justify-center rounded-full font-extrabold border ${
+                              compact ? "px-1 py-0.2 text-[7px] sm:text-[7.5px]" : "px-1.5 py-0.5 text-[9.5px] sm:text-[10px]"
+                            } ${
                               row.growth == null
                                 ? "bg-purple-50 text-purple-700 border-purple-200"
                                 : row.growth >= 0
@@ -1605,7 +1629,9 @@ function DonutBlock({
                       </div>
 
                       {/* % of Sale */}
-                      <span className="w-14 sm:w-16 text-right font-bold text-slate-700 text-[11px] sm:text-xs">
+                      <span className={`text-right font-bold text-slate-700 ${
+                        compact ? "w-7 sm:w-9 text-[9px] sm:text-[9.5px]" : "w-14 sm:w-16 text-[11px] sm:text-xs"
+                      }`}>
                         {row.share}%
                       </span>
                     </div>
@@ -1630,6 +1656,7 @@ function DonutCard({
   theme = "purple",
   activeKey,
   onSelectKey,
+  compact = false,
 }: {
   title: string;
   center: string;
@@ -1640,13 +1667,14 @@ function DonutCard({
   theme?: "amber" | "purple";
   activeKey?: string;
   onSelectKey?: (key: string) => void;
+  compact?: boolean;
 }) {
   const cardBorder = theme === "amber"
     ? "border-amber-100/90 bg-gradient-to-br from-amber-50/20 via-white to-purple-50/20"
     : "border-purple-100/90 bg-gradient-to-br from-purple-50/25 via-white to-indigo-50/20";
 
   return (
-    <article className={`rounded-2xl border ${cardBorder} p-3.5 sm:p-4 shadow-xs`}>
+    <article className={`rounded-2xl border ${cardBorder} ${compact ? "p-3 sm:p-3.5" : "p-3.5 sm:p-4"} shadow-xs min-w-0 overflow-hidden flex flex-col justify-between`}>
       <DonutBlock
         title={title}
         center={center}
@@ -1656,6 +1684,7 @@ function DonutCard({
         empty={empty}
         activeKey={activeKey}
         onSelectKey={onSelectKey}
+        compact={compact}
       />
     </article>
   );

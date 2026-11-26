@@ -33,8 +33,8 @@ export default function CspProgramPage() {
         <h1 className="text-2xl font-bold text-slate-900">CSP Program</h1>
         <p className="mt-3 text-sm text-slate-600">
           {application?.status === 'under_review'
-            ? 'Your application is under review. The program appears in the sidebar after it is approved.'
-            : 'Apply from Programs. The CSP Program appears in the sidebar only after approval.'}
+            ? 'Your application is under review. The program will be available after it is approved.'
+            : 'Apply from Programs. The CSP Program is available only after approval.'}
         </p>
         <Link to="/ourprograms?tab=csp" className="mt-4 inline-block text-sm font-semibold text-[#EA580C]">
           Go to programs

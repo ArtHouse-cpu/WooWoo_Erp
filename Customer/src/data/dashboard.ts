@@ -81,13 +81,13 @@ export const exploreItems = [
 
 export const exploreItemsDesktop = [
   {
-    id: 'store',
+    id: 'supplies',
     title: 'Supplies',
     subtitle: 'Get materials | FREE 1st Shopping',
     icon: ShoppingBag,
     iconBg: 'bg-[#F3E8FF]',
     iconColor: 'text-[#7C3AED]',
-    image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=500&q=80',
+    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795614310/Screenshot_2026-11-25_191423.png',
   },
   {
     id: 'space',
@@ -96,7 +96,7 @@ export const exploreItemsDesktop = [
     icon: MapPin,
     iconBg: 'bg-[#FFEDD5]',
     iconColor: 'text-[#EA580C]',
-    image: 'https://images.unsplash.com/photo-1599508704512-2f19efd1e35f?auto=format&fit=crop&w=500&q=80',
+    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795614362/IMG_4127.png',
   },
   {
     id: 'services',
@@ -105,7 +105,7 @@ export const exploreItemsDesktop = [
     icon: Wrench,
     iconBg: 'bg-[#DBEAFE]',
     iconColor: 'text-[#2563EB]',
-    image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=500&q=80',
+    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795614616/Screenshot_2026-11-25_191945.png',
   },
   {
     id: 'events',
@@ -114,7 +114,7 @@ export const exploreItemsDesktop = [
     icon: Calendar,
     iconBg: 'bg-[#DCFCE7]',
     iconColor: 'text-[#16A34A]',
-    image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=500&q=80',
+    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795614888/Screenshot_2026-11-25_192419.png',
   },
   {
     id: 'cafe',
@@ -123,7 +123,7 @@ export const exploreItemsDesktop = [
     icon: Coffee,
     iconBg: 'bg-[#FEF9C3]',
     iconColor: 'text-[#CA8A04]',
-    image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=500&q=80',
+    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795616126/Screenshot_2026-11-25_194456.png',
   },
   {
     id: 'programs',
@@ -132,7 +132,7 @@ export const exploreItemsDesktop = [
     icon: Gift,
     iconBg: 'bg-[#FFF3EB]',
     iconColor: 'text-[#EA580C]',
-    image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=500&q=80',
+    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795615350/Screenshot_2026-11-25_193154.png',
   },
 ];
 
