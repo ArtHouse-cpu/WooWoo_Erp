@@ -43,6 +43,7 @@ import {
   handleCreateCustomer,
   handleDeleteCustomer,
   handleGetCustomers,
+  handleGetMemberships,
   handleGetWalletById,
   handleGetWalletInstructions,
   handleUpdateCustomer,
@@ -79,6 +80,45 @@ type CustomerRow = {
 };
 
 type SortKey = "name" | "mobile" | "membership" | "walletAmount" | "dueAmount";
+
+type MembershipFilterOption = { value: string; label: string };
+
+const FALLBACK_MEMBERSHIP_OPTIONS: MembershipFilterOption[] = [
+  { value: "general", label: "General" },
+  { value: "premium", label: "Premium" },
+  { value: "special", label: "Special" },
+  { value: "junior", label: "Junior" },
+  { value: "pro", label: "Pro" },
+];
+
+function MembershipFilterSelect({
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  value: string;
+  options: MembershipFilterOption[];
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <select
+      aria-label="Filter by membership"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={className}
+    >
+      <option value="all">All memberships</option>
+      <option value="non_member">Non-member</option>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 const AVATAR_PALETTES = [
   { bg: "bg-purple-100", text: "text-purple-700" },
@@ -185,6 +225,10 @@ export default function CustomerScreen() {
 
   // Tab & Filter States
   const [membershipTab, setMembershipTab] = useState<"all" | "member" | "non_member">("all");
+  const [membershipTypeFilter, setMembershipTypeFilter] = useState("all");
+  const [membershipOptions, setMembershipOptions] = useState<MembershipFilterOption[]>(
+    FALLBACK_MEMBERSHIP_OPTIONS,
+  );
   const [kpiFilter, setKpiFilter] = useState<"all" | "visited_today">("all");
   const [dueFilter, setDueFilter] = useState<"all" | "has_due" | "no_due">("all");
   const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
@@ -251,14 +295,44 @@ export default function CustomerScreen() {
 
   useEffect(() => {
     setPageIndex(1);
-  }, [debouncedSearch, membershipTab, kpiFilter, dueFilter]);
+  }, [debouncedSearch, membershipTab, membershipTypeFilter, kpiFilter, dueFilter]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void handleGetMemberships({ status: "All" }, controller.signal)
+      .then((res) => {
+        const plans = Array.isArray(res?.memberships) ? res.memberships : [];
+        const seen = new Set<string>();
+        const next: MembershipFilterOption[] = [];
+        for (const plan of plans) {
+          const value = String(plan?.planId || "").trim().toLowerCase();
+          const label = String(plan?.displayName || plan?.planId || "").trim();
+          if (!value || value === "none" || value === "all" || seen.has(value) || !label) continue;
+          seen.add(value);
+          next.push({ value, label });
+        }
+        if (next.length > 0) {
+          next.sort((a, b) => a.label.localeCompare(b.label));
+          setMembershipOptions(next);
+        }
+      })
+      .catch(() => {
+        /* keep the fallback membership list */
+      });
+    return () => controller.abort();
+  }, []);
 
   const fetchCustomers = useCallback(
     async (signal?: AbortSignal) => {
       try {
         setLoadingCustomers(true);
         const isVisited = kpiFilter === "visited_today";
-        const membershipQuery = membershipTab !== "all" ? membershipTab : "";
+        const membershipQuery =
+          membershipTypeFilter !== "all"
+            ? membershipTypeFilter
+            : membershipTab !== "all"
+              ? membershipTab
+              : "";
 
         const response = await handleGetCustomers(
           debouncedSearch,
@@ -329,7 +403,7 @@ export default function CustomerScreen() {
         setLoadingCustomers(false);
       }
     },
-    [debouncedSearch, pageSize, pageIndex, kpiFilter, membershipTab],
+    [debouncedSearch, pageSize, pageIndex, kpiFilter, membershipTab, membershipTypeFilter],
   );
 
   useEffect(() => {
@@ -978,7 +1052,10 @@ export default function CustomerScreen() {
           {/* All Customers Tab */}
           <button
             type="button"
-            onClick={() => setMembershipTab("all")}
+            onClick={() => {
+              setMembershipTab("all");
+              setMembershipTypeFilter("all");
+            }}
             className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
               membershipTab === "all"
                 ? "bg-[#6344E7] text-white shadow-xs"
@@ -998,7 +1075,10 @@ export default function CustomerScreen() {
           {/* Members Tab */}
           <button
             type="button"
-            onClick={() => setMembershipTab("member")}
+            onClick={() => {
+              setMembershipTab("member");
+              setMembershipTypeFilter("all");
+            }}
             className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
               membershipTab === "member"
                 ? "bg-[#6344E7] text-white shadow-xs"
@@ -1018,7 +1098,10 @@ export default function CustomerScreen() {
           {/* Non-Members Tab */}
           <button
             type="button"
-            onClick={() => setMembershipTab("non_member")}
+            onClick={() => {
+              setMembershipTab("non_member");
+              setMembershipTypeFilter("non_member");
+            }}
             className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
               membershipTab === "non_member"
                 ? "bg-[#6344E7] text-white shadow-xs"
@@ -1050,6 +1133,20 @@ export default function CustomerScreen() {
             />
           </div>
 
+          <MembershipFilterSelect
+            value={membershipTypeFilter}
+            options={membershipOptions}
+            onChange={(value) => {
+              setMembershipTypeFilter(value);
+              setMembershipTab(value === "non_member" ? "non_member" : "all");
+            }}
+            className={`max-w-[11rem] rounded-xl border bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:border-[#6344E7] focus:outline-hidden focus:ring-1 focus:ring-[#6344E7] ${
+              membershipTypeFilter !== "all"
+                ? "border-[#6344E7] bg-purple-50/70 text-[#6344E7]"
+                : "border-slate-200"
+            }`}
+          />
+
           {/* Filters Toggle Button */}
           <div className="relative">
             <button
@@ -1059,14 +1156,14 @@ export default function CustomerScreen() {
                 setShowColumnsDropdown(false);
               }}
               className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                kpiFilter !== "all" || dueFilter !== "all" || showFiltersDropdown
+                kpiFilter !== "all" || dueFilter !== "all" || membershipTypeFilter !== "all" || showFiltersDropdown
                   ? "border-[#6344E7] bg-purple-50/70 text-[#6344E7]"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
               <SlidersHorizontal size={13} />
               <span>Filters</span>
-              {(kpiFilter !== "all" || dueFilter !== "all") && (
+              {(kpiFilter !== "all" || dueFilter !== "all" || membershipTypeFilter !== "all") && (
                 <span className="h-2 w-2 rounded-full bg-[#6344E7]" />
               )}
             </button>
@@ -1074,6 +1171,17 @@ export default function CustomerScreen() {
             {/* Filters Dropdown Menu */}
             {showFiltersDropdown && (
               <div className="absolute right-0 top-full mt-1.5 z-30 w-56 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl">
+                <span className="block text-xs font-black text-slate-700 mb-1.5">Membership</span>
+                <MembershipFilterSelect
+                  value={membershipTypeFilter}
+                  options={membershipOptions}
+                  onChange={(value) => {
+                    setMembershipTypeFilter(value);
+                    setMembershipTab(value === "non_member" ? "non_member" : "all");
+                    setShowFiltersDropdown(false);
+                  }}
+                  className="mb-3 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:border-[#6344E7] focus:outline-hidden focus:ring-1 focus:ring-[#6344E7]"
+                />
                 <span className="block text-xs font-black text-slate-700 mb-1.5">Activity Filter</span>
                 <div className="space-y-1 mb-3">
                   <button
@@ -1705,6 +1813,18 @@ export default function CustomerScreen() {
             className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
           />
         </div>
+
+        <MembershipFilterSelect
+          value={membershipTypeFilter}
+          options={membershipOptions}
+          onChange={(value) => {
+            setMembershipTypeFilter(value);
+            setMembershipTab(value === "non_member" ? "non_member" : "all");
+          }}
+          className={`w-full rounded-xl border bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#6344E7] ${
+            membershipTypeFilter !== "all" ? "border-[#6344E7]" : "border-slate-200"
+          }`}
+        />
 
         {/* Customer Cards List */}
         {loadingCustomers && processedCustomers.length === 0 ? (

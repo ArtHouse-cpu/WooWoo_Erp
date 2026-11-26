@@ -21,6 +21,7 @@ import {
   Gift,
   LayoutDashboard,
   Calendar,
+  Home,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CspJoinModal } from "./CspJoinModal";
@@ -549,6 +550,7 @@ export function ProgramsBottomSheet({
 }: ProgramsBottomSheetProps) {
   const navigate = useNavigate();
   const customer = useAuthStore((state) => state.customer);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { isPremium } = useMembership();
   const { application, loaded: cspLoaded, refresh: refreshCsp } = useCspApplication();
   const { application: hapApplication, loaded: hapLoaded, refresh: refreshHap } = useHapApplication();
@@ -559,11 +561,15 @@ export function ProgramsBottomSheet({
   const handleTabClick = (tab: TabId) => {
     setActiveTab(tab);
     if (asPage) {
-      if (tab === "all") {
-        navigate("/ourprograms", { replace: true });
-      } else {
-        navigate(`/ourprograms?tab=${tab}`, { replace: true });
-      }
+      const path =
+        tab === "all"
+          ? "/program"
+          : tab === "csp"
+            ? "/program/csp"
+            : tab === "hap"
+              ? "/program/hap"
+              : "/program/cvp";
+      navigate(path, { replace: true });
     }
   };
 
@@ -668,7 +674,12 @@ export function ProgramsBottomSheet({
     if (!asPage) {
       onClose();
     }
-    const path = tab === "csp" ? "/program/csp" : tab === "hap" ? "/program/hap" : "/program/cvp";
+    const path =
+      tab === "csp"
+        ? "/program/csp/dashboard"
+        : tab === "hap"
+          ? "/program/hap/dashboard"
+          : "/program/cvp/dashboard";
     navigate(path);
   };
 
@@ -952,7 +963,7 @@ export function ProgramsBottomSheet({
     <>
       <AnimatePresence>
         {(asPage || isOpen) && (
-          <div className={asPage ? "min-h-dvh bg-[#F6F5FB] flex justify-center items-end sm:items-center md:items-center px-0 md:px-6 py-0 md:py-6" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"}>
+          <div className={asPage ? "min-h-dvh bg-[#F3F5F9] md:px-6 md:py-6" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"}>
             {asPage ? null : (
             <motion.div
               initial={{ opacity: 0 }}
@@ -970,7 +981,7 @@ export function ProgramsBottomSheet({
               transition={{ type: "spring", damping: 26, stiffness: 240 }}
               className={
                 asPage
-                  ? `relative flex ${isCurrentProgramJoined ? "h-auto max-h-dvh" : "h-dvh md:h-auto"} w-full max-w-3xl flex-col overflow-hidden bg-white md:max-h-[calc(100dvh-3rem)] rounded-t-[32px] md:rounded-[32px] md:border md:border-slate-100 shadow-sm`
+                  ? "relative mx-auto flex w-full max-w-5xl flex-col overflow-hidden bg-white md:rounded-[28px] md:border md:border-slate-200 md:shadow-sm"
                   : "relative z-10 flex max-h-[90dvh] h-auto w-full max-w-lg flex-col rounded-t-[32px] sm:rounded-[32px] bg-white shadow-2xl overflow-hidden border-t sm:border border-slate-100"
               }
             >
@@ -981,7 +992,7 @@ export function ProgramsBottomSheet({
               )}
 
               {/* Header Info */}
-              <div className="relative shrink-0 px-5 pb-3 flex items-center justify-between">
+              <div className={`relative shrink-0 px-5 pb-3 flex items-center justify-between gap-3 ${asPage ? "pt-4 md:px-6 md:pt-5" : ""}`}>
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-[18px] bg-[#0A0F1D] text-amber-300 shadow-sm">
                     <Sparkles className="h-6 w-6 sm:h-6.5 sm:w-6.5 text-amber-300" strokeWidth={2.2} />
@@ -996,19 +1007,29 @@ export function ProgramsBottomSheet({
                   </div>
                 </div>
 
-                {/* Close Button */}
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex h-8 w-8 sm:h-8.5 sm:w-8.5 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB] cursor-pointer"
-                  aria-label="Close sheet"
-                >
-                  <X className="h-4.5 w-4.5" strokeWidth={2.5} />
-                </button>
+                {asPage && !isAuthenticated ? (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0A0F1D] px-3.5 py-2 text-[12.5px] font-extrabold text-white transition hover:bg-[#1B2438] cursor-pointer"
+                  >
+                    <Home className="h-4 w-4" strokeWidth={2.4} />
+                    <span>Return to home</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex h-8 w-8 sm:h-8.5 sm:w-8.5 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB] cursor-pointer"
+                    aria-label="Close sheet"
+                  >
+                    <X className="h-4.5 w-4.5" strokeWidth={2.5} />
+                  </button>
+                )}
               </div>
 
               {/* Sleek Program Category Pills: All -> CSP -> HAP -> CVP */}
-              <div className="shrink-0 px-4 sm:px-5 mb-3 flex items-center gap-2 sm:gap-2.5 overflow-x-auto scrollbar-none pb-0.5">
+              <div className={`shrink-0 px-4 sm:px-5 mb-3 flex items-center gap-2 sm:gap-2.5 overflow-x-auto scrollbar-none pb-0.5 ${asPage ? "md:px-6" : ""}`}>
                 {/* 1. All */}
                 <button
                   type="button"
@@ -1209,7 +1230,7 @@ export function ProgramsBottomSheet({
                     <div
                       ref={galleryScrollRef}
                       onScroll={handleGalleryScroll}
-                      className="px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1 snap-x snap-mandatory"
+                      className={`px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1 snap-x snap-mandatory ${asPage ? "md:grid md:grid-cols-5 md:gap-3 md:overflow-visible md:px-6 md:snap-none" : ""}`}
                     >
                       {(activeTab === "csp"
                         ? cspGallery
@@ -1221,7 +1242,7 @@ export function ProgramsBottomSheet({
                           return (
                             <div
                               key={item.id}
-                              className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
+                              className={`relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs ${asPage ? "md:h-[210px] md:w-full" : ""}`}
                             >
                               {item.customComponent()}
                             </div>
@@ -1231,7 +1252,7 @@ export function ProgramsBottomSheet({
                         return (
                           <div
                             key={item.id}
-                            className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
+                            className={`relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs ${asPage ? "md:h-[210px] md:w-full" : ""}`}
                           >
                             <img
                               src={item.image}
@@ -1274,7 +1295,7 @@ export function ProgramsBottomSheet({
                     </div>
 
                     {/* Pagination Dots */}
-                    <div className="flex justify-center gap-1.5 mt-2 mb-4">
+                    <div className={`flex justify-center gap-1.5 mt-2 mb-4 ${asPage ? "md:hidden" : ""}`}>
                       {[0, 1, 2, 3, 4].map((idx) => (
                         <button
                           key={idx}
@@ -1295,7 +1316,7 @@ export function ProgramsBottomSheet({
                     </div>
 
                     {/* Statistics Grid */}
-                    <div className="grid grid-cols-3 gap-2.5 px-5 mb-4">
+                    <div className={`grid grid-cols-3 gap-2.5 px-5 mb-4 ${asPage ? "md:gap-4 md:px-6" : ""}`}>
                       {activeTab === "csp" ? (
                         <>
                           {/* Stat 1 */}
@@ -1435,7 +1456,7 @@ export function ProgramsBottomSheet({
                     </div>
 
                     {/* Main Detailed Info Card */}
-                    <div className="mx-5 p-4 rounded-[24px] border bg-[#FAFBFD] relative overflow-hidden text-left shadow-2xs border-slate-100">
+                    <div className={`mx-5 p-4 rounded-[24px] border bg-[#FAFBFD] relative overflow-hidden text-left shadow-2xs border-slate-100 ${asPage ? "md:mx-6 md:p-5" : ""}`}>
                       {/* Info Card Content */}
                       <div className="flex justify-between items-start gap-4 mb-4">
                         <div className="flex-1">
@@ -1598,7 +1619,7 @@ export function ProgramsBottomSheet({
               </div>
 
               {/* Fixed Bottom Actions */}
-              <div className="shrink-0 bg-white border-t border-slate-100 px-4 pt-3 pb-[max(0.85rem,env(safe-area-inset-bottom))] sm:p-4 flex gap-3 z-10">
+              <div className={`shrink-0 bg-white border-t border-slate-100 px-4 pt-3 pb-[max(0.85rem,env(safe-area-inset-bottom))] sm:p-4 flex gap-3 z-10 ${asPage ? "sticky bottom-0 md:px-6" : ""}`}>
                 {isCurrentProgramJoined ? (
                   <button
                     type="button"
@@ -1631,11 +1652,7 @@ export function ProgramsBottomSheet({
                             ? "Hi! I would like to know more about the House Affiliate Program (HAP) at Woo Woo Art House."
                             : "Hi! I would like to know more about the Community Volunteering Program (CVP) at Woo Woo Art House.";
                         window.open(`https://wa.me/918073988123?text=${encodeURIComponent(text)}`, "_blank");
-                        if (asPage) {
-                          navigate("/home");
-                        } else {
-                          onClose();
-                        }
+                        if (!asPage) onClose();
                       }}
                       className={`flex-1 py-3 px-3 rounded-[16px] border text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                         activeTab === "all"

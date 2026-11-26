@@ -29,6 +29,7 @@ import {
   UserPlus,
   Users,
   Utensils,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -73,9 +74,11 @@ import ProductShareModal from "@/features/catalogue/components/ProductShareModal
 import SpaceOfferPreview from "@/features/catalogue/components/SpaceOfferPreview";
 import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { usePermission } from "@/hooks/usePermission";
+import { PERMISSIONS } from "@/constants/permissions";
 import { useAppSelector } from "@/store/hooks";
 import RevenueCard from "@/features/home/components/RevenueCard";
 import DashboardMembershipCards from "@/features/home/components/DashboardMembershipCards";
+import WalletAdjustModal from "@/features/home/components/WalletAdjustModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
@@ -597,7 +600,7 @@ function paymentStatusForWhatsApp(
 export default function HomeScreen() {
   const navigate = useNavigate();
   const staff = useAppSelector((state) => state.user);
-  const { canPath } = usePermission();
+  const { canPath, can } = usePermission();
 
   const [openCreateCustomerModal, setOpenCreateCustomerModal] = useState(false);
   const [openCreateSubscriptionModal, setOpenCreateSubscriptionModal] =
@@ -705,6 +708,11 @@ export default function HomeScreen() {
   const [showViewCustomerModal, setShowViewCustomerModal] = useState(false);
   const [customerModalLoading, setCustomerModalLoading] = useState(false);
   const [actionMenuCustomerId, setActionMenuCustomerId] = useState<string | null>(null);
+  const [walletCustomer, setWalletCustomer] = useState<{
+    id: string;
+    name: string;
+    phone?: string;
+  } | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
   const [invoiceRefresh, setInvoiceRefresh] = useState(0);
 
@@ -3836,7 +3844,7 @@ export default function HomeScreen() {
                                 className="fixed inset-0 z-30"
                                 onClick={() => setActionMenuCustomerId(null)}
                               />
-                              <div className="absolute right-0 top-full z-40 mt-1.5 w-38 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                              <div className="absolute right-0 top-full z-40 mt-1.5 w-48 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -3860,6 +3868,23 @@ export default function HomeScreen() {
                                   <SquarePen size={14} className="text-slate-400" />
                                   <span>Edit Customer</span>
                                 </button>
+                                {can(PERMISSIONS.WALLET_MANAGE) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionMenuCustomerId(null);
+                                      setWalletCustomer({
+                                        id: customerId,
+                                        name: c.name,
+                                        phone: hasPhone ? phoneNum : "",
+                                      });
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                  >
+                                    <Wallet size={14} className="text-violet-500" />
+                                    <span>Add / Deduct wallet</span>
+                                  </button>
+                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -4069,6 +4094,19 @@ export default function HomeScreen() {
           }}
         />
       )}
+
+      {walletCustomer ? (
+        <WalletAdjustModal
+          customer={walletCustomer}
+          createdBy={{
+            m_staff_id: staff?.m_staff_id,
+            m_staff_name: staff?.m_staff_name,
+            m_staff_email: staff?.m_staff_email,
+          }}
+          onClose={() => setWalletCustomer(null)}
+          onSaved={loadDashboardData}
+        />
+      ) : null}
 
       {/* Customer Edit Modal */}
       {showEditCustomerModal && (

@@ -691,6 +691,10 @@ const getCustomers = async (req, res) => {
           { membershipType: { $exists: false } },
         ],
       });
+    } else if (membershipFilter && membershipFilter !== 'all') {
+      andClauses.push({
+        membershipType: new RegExp(`^${escapeRegex(membershipFilter)}$`, 'i'),
+      });
     }
 
     if (andClauses.length > 0) {

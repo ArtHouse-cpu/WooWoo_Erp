@@ -55,6 +55,17 @@ export type SegmentPayments = {
   methods: PaymentMethodRow[];
 };
 
+export type MembershipTypeRow = {
+  key: string;
+  label: string;
+  revenue: number;
+  bills: number;
+  qty: number;
+  share: number;
+  previousRevenue: number;
+  changePct: number | null;
+};
+
 export type SegmentCard = {
   key: "food" | "space" | "store" | "membership";
   label: string;
@@ -72,6 +83,7 @@ export type SegmentCard = {
   expiredMembers?: number;
   topSellingMembership?: string;
   payments?: SegmentPayments;
+  types?: MembershipTypeRow[];
 };
 
 export type InsightsPayload = {
