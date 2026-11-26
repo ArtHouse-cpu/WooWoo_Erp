@@ -114,7 +114,7 @@ export const exploreItemsDesktop = [
     icon: Calendar,
     iconBg: 'bg-[#DCFCE7]',
     iconColor: 'text-[#16A34A]',
-    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795614888/Screenshot_2026-11-25_192419.png',
+    image: 'https://res.cloudinary.com/nciretjr/image/upload/v1795663396/Screenshot_2026-11-26_085248.png',
   },
   {
     id: 'cafe',
