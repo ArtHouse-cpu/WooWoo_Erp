@@ -12,7 +12,6 @@ import {
   List,
   Search,
   Sparkles,
-  Store,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -212,7 +211,7 @@ export default function MyBookingsPage() {
               to="/spaces"
               className="flex items-center gap-1.5 rounded-xl bg-[#673DE6] px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#5830d4] active:scale-95 cursor-pointer"
             >
-              <Store className="h-3.5 w-3.5" />
+              <CalendarCheck className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Book Space</span>
             </Link>
           </div>
@@ -384,7 +383,7 @@ export default function MyBookingsPage() {
               to="/spaces"
               className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[#673DE6] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#5830d4]"
             >
-              <Store size={14} />
+              <CalendarCheck size={14} />
               <span>Browse Spaces &amp; Coworking</span>
             </Link>
           </div>
@@ -635,7 +634,6 @@ export default function MyBookingsPage() {
         </div>
         <div className="xl:hidden">
           <div className="space-y-5 pb-6">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
             {content}
           </div>
         </div>

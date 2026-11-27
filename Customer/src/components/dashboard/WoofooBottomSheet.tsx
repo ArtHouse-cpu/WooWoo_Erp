@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {
   X,
   Palette,
@@ -62,6 +63,7 @@ type MomentCard = {
 };
 
 export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
 
   const pills: PillItem[] = [
@@ -374,13 +376,10 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
               {/* View Menu Button */}
               <button
                 type="button"
-                onClick={() =>
-                  window.open(
-                    'https://www.instagram.com/p/Dft-yx6EZML/?img_index=16&cplk=MXVwNnVtNmtmeDlscw==',
-                    '_blank',
-                    'noopener,noreferrer'
-                  )
-                }
+                onClick={() => {
+                  onClose();
+                  navigate('/woofoo/menu');
+                }}
                 className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
               >
                 <UtensilsCrossed className="h-4.5 w-4.5" strokeWidth={2.5} />

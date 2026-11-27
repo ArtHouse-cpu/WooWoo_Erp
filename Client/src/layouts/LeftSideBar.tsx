@@ -343,7 +343,7 @@ const MENU_GROUPS: MenuGroup[] = [
       },
       {
         name: "Announcements",
-        label: "WhatsApp Announcement",
+        label: "WhatsApp ",
         icon: Megaphone,
         path: "/announcements",
       },

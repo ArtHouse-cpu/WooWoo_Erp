@@ -892,7 +892,7 @@ function SegmentCards({ segments }: { segments: InsightsPayload["segments"] }) {
       className={
         isSingle
           ? "w-full h-full"
-          : "flex overflow-x-auto gap-3 pb-2 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-none snap-x snap-mandatory overscroll-x-contain"
+          : "flex overflow-x-auto gap-3 pb-2 pt-1 scrollbar-none snap-x snap-mandatory overscroll-x-contain"
       }
     >
       {segments.map((row) => {
@@ -2209,7 +2209,7 @@ function TopSection({
         className={
           isSingle
             ? "w-full"
-            : "flex overflow-x-auto gap-3 pb-3 pt-1 -mx-3 px-3 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 scrollbar-none snap-x snap-mandatory overscroll-x-contain"
+            : "flex overflow-x-auto gap-3 pb-3 pt-1 lg:grid lg:grid-cols-3 scrollbar-none snap-x snap-mandatory overscroll-x-contain"
         }
       >
         {columns.map(column => {

@@ -46,7 +46,7 @@ export const dashboardNav: NavItem[] = [
 
 export const exploreItems = [
   {
-    id: 'store',
+    id: 'supplies',
     title: 'Supplies',
     subtitle: 'Get materials | FREE 1st Shopping',
     gradient: 'from-[#F3E8FF] to-[#EDE9FE]',
