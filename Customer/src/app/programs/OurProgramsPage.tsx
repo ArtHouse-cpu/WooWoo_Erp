@@ -1,6 +1,7 @@
-import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
+import {useLocation, useNavigate, useParams, useSearchParams} from 'react-router-dom';
 import {ProgramsBottomSheet} from '../../components/dashboard/ProgramsBottomSheet';
 import {useAuthStore} from '../../store/authStore';
+import {rememberReturnTo} from '../../utils/returnTo';
 
 const validTabs = new Set(['all', 'csp', 'hap', 'cvp']);
 
@@ -10,6 +11,7 @@ type OurProgramsPageProps = {
 
 export default function OurProgramsPage({defaultTab}: OurProgramsPageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const {tab: routeTab} = useParams<{tab?: string}>();
   const [params] = useSearchParams();
@@ -20,7 +22,15 @@ export default function OurProgramsPage({defaultTab}: OurProgramsPageProps) {
     : 'all';
 
   const handleClose = () => {
-    navigate(isAuthenticated ? '/home' : '/login');
+    if (isAuthenticated) {
+      navigate('/home');
+      return;
+    }
+    const returnTo = `${location.pathname}${location.search}`;
+    rememberReturnTo(returnTo);
+    navigate('/login', {
+      state: {returnTo, from: location},
+    });
   };
 
   return (

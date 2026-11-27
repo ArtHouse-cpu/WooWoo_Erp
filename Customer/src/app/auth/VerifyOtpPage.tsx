@@ -36,7 +36,12 @@ export default function VerifyOtpPage() {
   const timer = useResendTimer(45);
 
   useEffect(() => {
-    if (!identifier) navigate('/login', {replace: true});
+    if (!identifier) {
+      navigate('/login', {
+        replace: true,
+        state: state.returnTo ? {returnTo: state.returnTo} : undefined,
+      });
+    }
   }, [identifier, navigate]);
 
   useEffect(() => {
@@ -49,7 +54,9 @@ export default function VerifyOtpPage() {
   const changePath = purpose === 'forgot-password' ? '/forgot-password' : '/login';
 
   const closeSheet = () => {
-    navigate(changePath);
+    navigate(changePath, {
+      state: state.returnTo ? {returnTo: state.returnTo} : undefined,
+    });
   };
 
   const onVerify = async () => {

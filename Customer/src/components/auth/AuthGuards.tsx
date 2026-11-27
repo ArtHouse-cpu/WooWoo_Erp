@@ -8,7 +8,7 @@ import {
   needsOnboarding,
   needsProfileSetup,
 } from '../../utils/onboarding';
-import {isInvoiceReturnPath, rememberReturnTo} from '../../utils/returnTo';
+import {isInvoiceReturnPath, consumeReturnTo, rememberReturnTo} from '../../utils/returnTo';
 
 export function AuthBootstrap({children}: {children: React.ReactNode}) {
   const {isLoading, setSession, setLoading, logout} = useAuthStore();
@@ -105,8 +105,14 @@ export function AppRoute() {
 export function PublicOnlyRoute() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const customer = useAuthStore(s => s.customer);
+  const location = useLocation();
   if (isAuthenticated) {
-    return <Navigate to={getPostAuthPath(customer)} replace />;
+    return (
+      <Navigate
+        to={consumeReturnTo(location.state) || getPostAuthPath(customer)}
+        replace
+      />
+    );
   }
   return <Outlet />;
 }

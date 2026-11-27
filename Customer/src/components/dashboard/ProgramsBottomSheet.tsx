@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   X,
   ShoppingBag,
@@ -31,6 +31,7 @@ import { useCspApplication } from "../../hooks/useCspApplication";
 import { useHapApplication } from "../../hooks/useHapApplication";
 import { useMembership } from "../../context/MembershipContext";
 import { useAuthStore } from "../../store/authStore";
+import { rememberReturnTo } from "../../utils/returnTo";
 import { cspProductApi, type CspProgramProduct } from "../../services/csp.service";
 import { authApi } from "../../services/auth.service";
 import type { WalletDashboard } from "../../types/auth";
@@ -549,7 +550,9 @@ export function ProgramsBottomSheet({
   asPage = false,
 }: ProgramsBottomSheetProps) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const customer = useAuthStore((state) => state.customer);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { isPremium } = useMembership();
   const { application, loaded: cspLoaded, refresh: refreshCsp } = useCspApplication();
   const { application: hapApplication, loaded: hapLoaded, refresh: refreshHap } = useHapApplication();
@@ -668,6 +671,56 @@ export function ProgramsBottomSheet({
       : activeTab === "cvp"
       ? isCvpJoined
       : false;
+
+  const startJoin = (tab: "csp" | "hap" | "cvp") => {
+    if (!isAuthenticated) {
+      const returnTo = `/program/${tab}?join=${tab}`;
+      rememberReturnTo(returnTo);
+      navigate("/login", {
+        state: {
+          returnTo,
+          from: { pathname: `/program/${tab}`, search: `?join=${tab}` },
+        },
+      });
+      return;
+    }
+    if (tab === "csp") {
+      if (!isPremium) {
+        Swal.fire({
+          icon: "info",
+          title: "Premium Membership Required",
+          text: "Upgrade to Premium to join CSP.",
+          confirmButtonText: "OK",
+          confirmButtonColor: "#4F46E5",
+        });
+        return;
+      }
+      setIsJoinModalOpen(true);
+      return;
+    }
+    if (tab === "hap") {
+      setIsHapJoinOpen(true);
+      return;
+    }
+    setIsCvpJoinOpen(true);
+  };
+
+  useEffect(() => {
+    const join = (searchParams.get("join") || "").toLowerCase();
+    if (join !== "csp" && join !== "hap" && join !== "cvp") return;
+    if (!isAuthenticated) return;
+    const loaded = join === "csp" ? cspLoaded : join === "hap" ? hapLoaded : cvpLoaded;
+    if (!loaded) return;
+    const alreadyJoined =
+      join === "csp" ? isCspJoined : join === "hap" ? isHapJoined : isCvpJoined;
+    const next = new URLSearchParams(searchParams);
+    next.delete("join");
+    setSearchParams(next, { replace: true });
+    if (activeTab !== join) setActiveTab(join);
+    if (!alreadyJoined) startJoin(join);
+    // Open once when the customer returns from login.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, cspLoaded, hapLoaded, cvpLoaded, searchParams]);
 
   const handleOpenDashboard = (tab: "csp" | "hap" | "cvp") => {
     if (!asPage) {
@@ -1665,27 +1718,8 @@ export function ProgramsBottomSheet({
                           handleTabClick("csp");
                           return;
                         }
-                        if (activeTab === "csp") {
-                          if (!isPremium) {
-                            Swal.fire({
-                              icon: "info",
-                              title: "Premium Membership Required",
-                              text: "Upgrade to Premium to join CSP.",
-                              confirmButtonText: "OK",
-                              confirmButtonColor: "#4F46E5",
-                            });
-                            return;
-                          }
-                          setIsJoinModalOpen(true);
-                          return;
-                        }
-                        if (activeTab === "hap") {
-                          setIsHapJoinOpen(true);
-                          return;
-                        }
-                        if (activeTab === "cvp") {
-                          setIsCvpJoinOpen(true);
-                          return;
+                        if (activeTab === "csp" || activeTab === "hap" || activeTab === "cvp") {
+                          startJoin(activeTab);
                         }
                       }}
                       className={`flex-1 py-3 px-3 rounded-[16px] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
