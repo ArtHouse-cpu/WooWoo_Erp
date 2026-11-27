@@ -19,7 +19,20 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
   const navigate = useNavigate();
   const customer = useAuthStore(s => s.customer);
   const logout = useAuthStore(s => s.logout);
-  const isPremium = String(customer?.membershipType || '').trim().toLowerCase() === 'premium';
+  const membershipType = String(
+    customer?.membershipType ||
+      (customer as any)?.membership ||
+      (customer as any)?.membershipPlan?.id ||
+      (customer as any)?.membershipPlan?.name ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+  const isPremiumOrElite =
+    membershipType === 'premium' ||
+    membershipType === 'elite' ||
+    membershipType.startsWith('premium') ||
+    membershipType.startsWith('elite');
   const storeBalance = Number(customer?.walletBalance ?? customer?.walletAmount ?? 0);
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
 
@@ -205,8 +218,8 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgra
           />
         </Link>
 
-        {/* Upgrade Membership Card (hidden if already premium) */}
-        {!isPremium && (
+        {/* Upgrade Membership Card (hidden if already premium or elite) */}
+        {!isPremiumOrElite && (
           <div className="rounded-[20px] bg-gradient-to-br from-[#8B5CF6] via-[#6366F1] to-[#2563EB] p-4 text-white shadow-lg">
             <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
               <Crown className="h-4 w-4" />
