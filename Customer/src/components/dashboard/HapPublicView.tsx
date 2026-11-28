@@ -288,7 +288,7 @@ export function HapPublicView({
             <TrendingUp className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.5} />
           </div>
           <div className="w-full text-center text-[10px] sm:text-[12.5px] font-black text-slate-900 leading-tight whitespace-nowrap tracking-tight">
-            20% Commission (upto)
+            20% Commission
           </div>
           <div className="mt-1 text-[7.5px] sm:text-[9px] font-bold text-slate-500 leading-tight">
             Earn up to 20% on bookings
