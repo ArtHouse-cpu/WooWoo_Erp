@@ -11,7 +11,6 @@ import {
   IndianRupee,
   Target,
   Store,
-  TrendingUp,
   Package,
   Wallet,
   Clock,
@@ -26,6 +25,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { CspJoinModal } from "./CspJoinModal";
 import { HapJoinModal } from "./HapJoinModal";
+import { HapPublicView } from "./HapPublicView";
 import { CvpJoinModal, type CvpApplication } from "./CvpJoinModal";
 import { useCspApplication } from "../../hooks/useCspApplication";
 import { useHapApplication } from "../../hooks/useHapApplication";
@@ -789,118 +789,6 @@ export function ProgramsBottomSheet({
     },
   ];
 
-  const hapGallery: GalleryItem[] = [
-    {
-      id: "hap-vid-1",
-      type: "video",
-      image:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
-      tag: "VIDEO",
-      title: "Invite Friends. Earn Unlimited!",
-      hasPlayButton: true,
-    },
-    {
-      id: "hap-custom-1",
-      type: "custom",
-      tag: "IMAGE",
-      customComponent: () => (
-        <div className="relative h-full w-full bg-gradient-to-br from-[#7C3AED] to-[#5B21B6] p-2.5 flex flex-col justify-between text-left text-white">
-          <div className="space-y-0.5">
-            <p className="text-[8px] font-black uppercase tracking-wider text-purple-200">
-              Your Network
-            </p>
-            <p className="text-[10px] font-black leading-tight text-white">
-              Your Earnings
-            </p>
-          </div>
-          <div className="flex items-end gap-0.5 h-12 mt-1 justify-around">
-            <div className="w-2 bg-purple-300/30 rounded-t-xs h-[25%]" />
-            <div className="w-2 bg-purple-300/40 rounded-t-xs h-[45%]" />
-            <div className="w-2 bg-purple-300/50 rounded-t-xs h-[60%]" />
-            <div className="w-2 bg-purple-300/65 rounded-t-xs h-[75%]" />
-            <div className="w-2 bg-white rounded-t-xs h-[95%]" />
-          </div>
-          <p className="text-[7.5px] font-bold text-purple-100 leading-snug">
-            Every action. Every time. You earn!
-          </p>
-        </div>
-      ),
-    },
-    {
-      id: "hap-vid-2",
-      type: "video",
-      image:
-        "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
-      tag: "VIDEO",
-      title: "Monetize what you already have!",
-      hasPlayButton: true,
-    },
-    {
-      id: "hap-custom-2",
-      type: "custom",
-      tag: "IMAGE",
-      customComponent: () => (
-        <div className="relative h-full w-full bg-white p-2 flex flex-col justify-between text-left border border-slate-100">
-          <div className="flex justify-between items-center">
-            <span className="text-[7px] font-black text-slate-800">
-              Earnings Overview
-            </span>
-            <span className="text-[5px] font-bold text-slate-400 bg-slate-50 px-1 py-0.25 rounded-xs">
-              This Month
-            </span>
-          </div>
-          <div className="mt-0.5">
-            <span className="text-[10px] font-black text-slate-900 leading-none">
-              ₹2,45,800
-            </span>
-            <p className="text-[5px] font-bold text-slate-400 leading-none">
-              Total Earnings
-            </p>
-          </div>
-          <div className="space-y-0.75 mt-0.5 text-[5.5px]">
-            <div className="flex justify-between items-center leading-none">
-              <div className="flex items-center gap-0.5 min-w-0">
-                <div className="w-1 h-1 rounded-full bg-purple-500 shrink-0" />
-                <span className="text-slate-500 truncate">Referrals</span>
-              </div>
-              <span className="font-extrabold text-slate-800">₹1.25L</span>
-            </div>
-            <div className="flex justify-between items-center leading-none">
-              <div className="flex items-center gap-0.5 min-w-0">
-                <div className="w-1 h-1 rounded-full bg-[#EA580C] shrink-0" />
-                <span className="text-slate-500 truncate">Memberships</span>
-              </div>
-              <span className="font-extrabold text-slate-800">₹70.2K</span>
-            </div>
-            <div className="flex justify-between items-center leading-none">
-              <div className="flex items-center gap-0.5 min-w-0">
-                <div className="w-1 h-1 rounded-full bg-green-500 shrink-0" />
-                <span className="text-slate-500 truncate">Store Orders</span>
-              </div>
-              <span className="font-extrabold text-slate-800">₹32.4K</span>
-            </div>
-            <div className="flex justify-between items-center leading-none">
-              <div className="flex items-center gap-0.5 min-w-0">
-                <div className="w-1 h-1 rounded-full bg-blue-500 shrink-0" />
-                <span className="text-slate-500 truncate">Events & Serv</span>
-              </div>
-              <span className="font-extrabold text-slate-800">₹17.6K</span>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "hap-img-3",
-      type: "image",
-      image:
-        "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&q=80",
-      tag: "IMAGE",
-      badge: "1/8",
-      title: "Be a part of a growing creative family!",
-    },
-  ];
-
   const cvpGallery: GalleryItem[] = [
     {
       id: "cvp-vid-1",
@@ -1223,11 +1111,20 @@ export function ProgramsBottomSheet({
                   </div>
                 ) : activeTab === "csp" && (enrolled || isCspJoined) ? (
                   <CspMemberDashboard products={cspProducts} loading={cspProductsLoading} />
-                ) : activeTab === "hap" && (hapApproved || isHapJoined) && hapApplication ? (
+                ) : activeTab === "hap" && (hapApproved || isHapJoined) && hapApplication && !asPage ? (
                   <HapMemberDashboard
                     networkSize={hapApplication.networkSize}
                     profession={hapApplication.profession}
                     presence={hapApplication.presence}
+                  />
+                ) : activeTab === "hap" ? (
+                  <HapPublicView
+                    asPage={asPage}
+                    isJoined={isHapJoined}
+                    hapApplication={hapApplication}
+                    onStartJoin={() => startJoin("hap")}
+                    onOpenDashboard={() => handleOpenDashboard("hap")}
+                    illustrationComponent={() => <HapIllustration />}
                   />
                 ) : activeTab === "cvp" && isCvpJoined && cvpApplication ? (
                   <CvpMemberDashboard application={cvpApplication} />
@@ -1241,29 +1138,6 @@ export function ProgramsBottomSheet({
                         status={application.status}
                         reason={application.rejectionReason}
                       />
-                    ) : null}
-
-                    {/* Status Notice for HAP */}
-                    {activeTab === "hap" &&
-                    (hapApplication?.status === "under_review" ||
-                      hapApplication?.status === "rejected") ? (
-                      <div
-                        className={`mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left ${
-                          hapApplication.status === "rejected"
-                            ? "border-rose-200 bg-rose-50"
-                            : "border-amber-200 bg-amber-50"
-                        }`}
-                      >
-                        <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-700">
-                          {hapApplication.status === "rejected" ? "Rejected" : "Waiting for approval"}
-                        </span>
-                        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-slate-700">
-                          {hapApplication.status === "rejected"
-                            ? hapApplication.rejectionReason?.trim() ||
-                              "No reason was provided. You can apply again."
-                            : "Your HAP application is under review. Please wait for approval."}
-                        </p>
-                      </div>
                     ) : null}
 
                     {/* Status Notice for CVP (if rejected) */}
@@ -1284,12 +1158,7 @@ export function ProgramsBottomSheet({
                       onScroll={handleGalleryScroll}
                       className={`px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1 snap-x snap-mandatory ${asPage ? "md:grid md:grid-cols-5 md:gap-3 md:overflow-visible md:px-6 md:snap-none" : ""}`}
                     >
-                      {(activeTab === "csp"
-                        ? cspGallery
-                        : activeTab === "hap"
-                        ? hapGallery
-                        : cvpGallery
-                      ).map((item) => {
+                      {(activeTab === "csp" ? cspGallery : cvpGallery).map((item) => {
                         if (item.type === "custom" && item.customComponent) {
                           return (
                             <div
@@ -1357,8 +1226,6 @@ export function ProgramsBottomSheet({
                             activeGalleryDot === idx
                               ? activeTab === "csp"
                                 ? "bg-[#EA580C] w-3.5"
-                                : activeTab === "hap"
-                                ? "bg-[#7C3AED] w-3.5"
                                 : "bg-[#059669] w-3.5"
                               : "bg-[#E5E7EB] w-1.5"
                           }`}
@@ -1405,45 +1272,6 @@ export function ProgramsBottomSheet({
                             </div>
                             <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
                               Customer Leads
-                            </div>
-                          </div>
-                        </>
-                      ) : activeTab === "hap" ? (
-                        <>
-                          {/* Stat 1 */}
-                          <div className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-2xl bg-[#F5F3FF] border border-[#EDE9FE] text-center min-w-0">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EDE9FE] text-[#7C3AED] mb-2 shrink-0">
-                              <IndianRupee className="h-4.5 w-4.5" strokeWidth={2.25} />
-                            </div>
-                            <div className="w-full text-center text-[9.5px] min-[360px]:text-[10.5px] sm:text-[12.5px] font-black text-slate-900 leading-none whitespace-nowrap tracking-tight">
-                              Zero Investment
-                            </div>
-                            <div className="mt-1 text-[7.5px] sm:text-[8px] font-bold text-slate-400 leading-tight">
-                              Start free with no joining fee
-                            </div>
-                          </div>
-                          {/* Stat 2 */}
-                          <div className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center min-w-0">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2 shrink-0">
-                              <TrendingUp className="h-4.5 w-4.5" strokeWidth={2.25} />
-                            </div>
-                            <div className="w-full text-center text-[8.5px] min-[360px]:text-[9px] min-[390px]:text-[10px] sm:text-[12px] font-black text-slate-900 leading-none whitespace-nowrap tracking-tight">
-                              20% Commission (upto)
-                            </div>
-                            <div className="mt-1 text-[7.5px] sm:text-[8px] font-bold text-slate-400 leading-tight">
-                              Earn up to 20% on bookings
-                            </div>
-                          </div>
-                          {/* Stat 3 */}
-                          <div className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center min-w-0">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2 shrink-0">
-                              <Calendar className="h-4.5 w-4.5" strokeWidth={2.25} />
-                            </div>
-                            <div className="w-full text-center text-[9.5px] min-[360px]:text-[10.5px] sm:text-[12.5px] font-black text-slate-900 leading-none whitespace-nowrap tracking-tight">
-                              Weekly Payout
-                            </div>
-                            <div className="mt-1 text-[7.5px] sm:text-[8px] font-bold text-slate-400 leading-tight">
-                              Get paid directly every single week
                             </div>
                           </div>
                         </>
@@ -1509,18 +1337,14 @@ export function ProgramsBottomSheet({
                               className={`inline-flex items-center justify-center text-[11px] font-black h-5 w-5 rounded-md leading-none ${
                                 activeTab === "csp"
                                   ? "bg-[#EA580C] text-white"
-                                  : activeTab === "hap"
-                                  ? "bg-[#7C3AED] text-white"
                                   : "bg-[#059669] text-white"
                               }`}
                             >
-                              {activeTab === "csp" ? "01" : activeTab === "hap" ? "02" : "03"}
+                              {activeTab === "csp" ? "01" : "03"}
                             </span>
                             <h4 className="text-[15px] font-black text-slate-900 leading-none">
                               {activeTab === "csp"
                                 ? "Creative Sailor Program"
-                                : activeTab === "hap"
-                                ? "House Affiliate Program"
                                 : "Community Volunteering Program"}
                             </h4>
                           </div>
@@ -1528,8 +1352,6 @@ export function ProgramsBottomSheet({
                           <p className="mt-3.5 text-[11.5px] font-bold text-slate-500 leading-relaxed max-w-[80%] md:max-w-[75%]">
                             {activeTab === "csp"
                               ? "A zero-cost opportunity for creative professionals and small businesses to sell their products directly at WOO WOO Art House."
-                              : activeTab === "hap"
-                              ? "Invite, engage & earn! Promote WOO WOO Art House and earn unlimited commission on every activity."
                               : "Experience art from the inside out! Join our energetic crew of creators, curators, and event hosts at WOO WOO Art House."}
                           </p>
                         </div>
@@ -1537,8 +1359,6 @@ export function ProgramsBottomSheet({
                         {/* Conditionally Render Custom Illustrations */}
                         {activeTab === "csp" ? (
                           <CspIllustration />
-                        ) : activeTab === "hap" ? (
-                          <HapIllustration />
                         ) : (
                           <CvpIllustration />
                         )}
@@ -1579,42 +1399,6 @@ export function ProgramsBottomSheet({
                               </div>
                               <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Sell Direct
-                              </span>
-                            </div>
-                          </>
-                        ) : activeTab === "hap" ? (
-                          <>
-                            {/* Feature 1 */}
-                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                                <IndianRupee className="h-3.5 w-3.5" strokeWidth={2.25} />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
-                                Zero Investment
-                              </span>
-                            </div>
-
-                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
-
-                            {/* Feature 2 */}
-                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                                <TrendingUp className="h-3.5 w-3.5" strokeWidth={2.25} />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
-                                Earn Unlimited
-                              </span>
-                            </div>
-
-                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
-
-                            {/* Feature 3 */}
-                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                                <Users className="h-3.5 w-3.5" strokeWidth={2.25} />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
-                                Monetize Network
                               </span>
                             </div>
                           </>
