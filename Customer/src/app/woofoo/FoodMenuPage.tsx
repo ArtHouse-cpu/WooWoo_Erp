@@ -236,7 +236,6 @@ export default function FoodMenuPage() {
               <FoodItemCard
                 key={item.id}
                 item={item}
-                onBookClick={() => handleOpenBooking(item.name)}
               />
             ))}
           </div>
@@ -280,7 +279,7 @@ export default function FoodMenuPage() {
 }
 
 /** Individual Food Item Card */
-function FoodItemCard({item, onBookClick}: {item: FoodMenuItem; onBookClick: () => void}) {
+function FoodItemCard({item}: {item: FoodMenuItem}) {
   return (
     <motion.article
       initial={{opacity: 0, y: 10}}
@@ -328,16 +327,6 @@ function FoodItemCard({item, onBookClick}: {item: FoodMenuItem; onBookClick: () 
             <p className="shrink-0 text-right text-sm font-black tracking-tight text-[#EA580C] sm:text-base">
               ₹{item.price.toLocaleString('en-IN')}
             </p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onBookClick();
-              }}
-              className="ml-1 py-1 px-2.5 rounded-lg bg-[#FFF0EB] text-[#EA580C] text-[11px] font-bold hover:bg-[#EA580C] hover:text-white transition cursor-pointer shrink-0"
-            >
-              Book
-            </button>
           </div>
 
           {item.description ? (
