@@ -233,11 +233,7 @@ export default function FoodMenuPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {filteredItems.map(item => (
-              <FoodItemCard
-                key={item.id}
-                item={item}
-                onBookClick={() => handleOpenBooking(item.name)}
-              />
+              <FoodItemCard key={item.id} item={item} />
             ))}
           </div>
         )}
@@ -280,7 +276,7 @@ export default function FoodMenuPage() {
 }
 
 /** Individual Food Item Card */
-function FoodItemCard({item, onBookClick}: {item: FoodMenuItem; onBookClick: () => void}) {
+function FoodItemCard({item}: {item: FoodMenuItem}) {
   return (
     <motion.article
       initial={{opacity: 0, y: 10}}
