@@ -1,4 +1,4 @@
-import {useState, useMemo} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
   ChevronLeft,
@@ -10,52 +10,67 @@ import {
   CalendarCheck,
 } from 'lucide-react';
 import {motion} from 'framer-motion';
-import {
-  FOOD_MENU_CATEGORIES,
-  SAMPLE_FOOD_MENU,
-  type FoodMenuCategory,
-  type FoodMenuItem,
-} from '../../data/foodMenu';
+import {foodCategoryEmoji} from '../../data/foodMenu';
+import {fetchCustomerFoods, type FoodMenuItem} from '../../services/food.service';
 import {FoodBookingModal} from '../../components/woofoo/FoodBookingModal';
 
 export default function FoodMenuPage() {
   const navigate = useNavigate();
 
-  // Category state (Drinks is default as requested)
-  const [activeCategory, setActiveCategory] = useState<FoodMenuCategory>('drinks');
-  // Search query state
+  const [menu, setMenu] = useState<FoodMenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  // Lead Booking Modal state
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [selectedItemForBooking, setSelectedItemForBooking] = useState<string | undefined>(undefined);
 
-  // Filter items dynamically by active category and search input
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError('');
+    void fetchCustomerFoods(controller.signal)
+      .then(items => {
+        if (!controller.signal.aborted) setMenu(items);
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return;
+        setMenu([]);
+        setLoadError(error instanceof Error ? error.message : 'Could not load the food menu.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const categories = useMemo(() => {
+    const names = [...new Set(menu.map(item => item.category).filter(Boolean))];
+    names.sort((a, b) => a.localeCompare(b));
+    return [{id: 'all', label: 'All', emoji: '🍽️'}, ...names.map(name => ({
+      id: name,
+      label: name,
+      emoji: foodCategoryEmoji(name),
+    }))];
+  }, [menu]);
+
   const filteredItems = useMemo(() => {
-    let items = SAMPLE_FOOD_MENU.filter(item => item.category === activeCategory);
-
     const query = searchQuery.trim().toLowerCase();
-    if (query) {
-      // If there's an active search query, also search across all categories if none found in active, or search within category
-      const inCat = items.filter(
-        item =>
-          item.name.toLowerCase().includes(query) ||
-          (item.description && item.description.toLowerCase().includes(query))
-      );
+    const inCategory =
+      activeCategory === 'all'
+        ? menu
+        : menu.filter(item => item.category === activeCategory);
 
-      if (inCat.length > 0) {
-        return inCat;
-      }
+    if (!query) return inCategory;
 
-      // If user typed something not in current tab, search all items so user finds it
-      return SAMPLE_FOOD_MENU.filter(
-        item =>
-          item.name.toLowerCase().includes(query) ||
-          (item.description && item.description.toLowerCase().includes(query))
-      );
-    }
+    const matches = (item: FoodMenuItem) =>
+      item.name.toLowerCase().includes(query) ||
+      (item.description && item.description.toLowerCase().includes(query));
 
-    return items;
-  }, [activeCategory, searchQuery]);
+    const inCat = inCategory.filter(matches);
+    if (inCat.length > 0) return inCat;
+    return menu.filter(matches);
+  }, [activeCategory, menu, searchQuery]);
 
   const handleOpenBooking = (itemName?: string) => {
     setSelectedItemForBooking(itemName);
@@ -149,9 +164,12 @@ export default function FoodMenuPage() {
         {/* Category Tabs (Horizontally scrollable on mobile) */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6 pb-2.5">
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -mx-1 px-1">
-            {FOOD_MENU_CATEGORIES.map(cat => {
+            {categories.map(cat => {
               const isActive = activeCategory === cat.id;
-              const count = SAMPLE_FOOD_MENU.filter(item => item.category === cat.id).length;
+              const count =
+                cat.id === 'all'
+                  ? menu.length
+                  : menu.filter(item => item.category === cat.id).length;
 
               return (
                 <button
@@ -185,7 +203,16 @@ export default function FoodMenuPage() {
 
       {/* Main Food Card Grid */}
       <main className="mx-auto max-w-6xl px-3 sm:px-6 pt-4 sm:pt-6">
-        {filteredItems.length === 0 ? (
+        {loading ? (
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-8 sm:p-12 text-center shadow-xs">
+            <p className="text-sm font-semibold text-slate-500">Loading the menu…</p>
+          </div>
+        ) : loadError ? (
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-8 sm:p-12 text-center shadow-xs">
+            <h3 className="text-base sm:text-lg font-extrabold text-slate-900">Menu unavailable</h3>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500">{loadError}</p>
+          </div>
+        ) : filteredItems.length === 0 ? (
           <div className="rounded-3xl border border-slate-200/80 bg-white p-8 sm:p-12 text-center shadow-xs">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-[#EA580C] mb-3">
               <UtensilsCrossed className="h-7 w-7" />
@@ -265,25 +292,19 @@ function FoodItemCard({item, onBookClick}: {item: FoodMenuItem; onBookClick: () 
         {/* Food Image Container with consistent dimensions */}
         <div className="relative aspect-4/3 w-full overflow-hidden bg-slate-100">
           <img
-            src={item.image}
+            src={item.image || undefined}
             alt={item.name}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-108"
+            className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-108 ${
+              item.image ? '' : 'hidden'
+            }`}
           />
+        </div>
 
-          {/* Subtle Tag Overlay if available */}
-          {item.tag && (
-            <div className="absolute left-2 top-2">
-              <span className="rounded-md bg-black/75 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-white backdrop-blur-xs">
-                {item.tag}
-              </span>
-            </div>
-          )}
-
-          {/* Veg / Non-Veg Indicator Dot */}
-          <div className="absolute right-2 top-2">
+        <div className="px-2.5 py-2 sm:px-3.5 sm:py-2.5">
+          <div className="flex items-center gap-2">
             <span
-              className={`flex h-4 w-4 items-center justify-center rounded-sm bg-white/90 p-0.5 backdrop-blur-xs border ${
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border bg-white ${
                 item.isVeg ? 'border-emerald-600' : 'border-rose-600'
               }`}
               title={item.isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
@@ -292,39 +313,20 @@ function FoodItemCard({item, onBookClick}: {item: FoodMenuItem; onBookClick: () 
                 className={`h-2 w-2 rounded-full ${item.isVeg ? 'bg-emerald-600' : 'bg-rose-600'}`}
               />
             </span>
+            <h3 className="min-w-0 flex-1 truncate text-left text-xs font-extrabold leading-snug text-slate-900 transition-colors group-hover:text-[#EA580C] sm:text-sm">
+              {item.name}
+            </h3>
+            <p className="shrink-0 text-right text-sm font-black tracking-tight text-[#EA580C] sm:text-base">
+              ₹{item.price.toLocaleString('en-IN')}
+            </p>
           </div>
-        </div>
 
-        {/* Content Section */}
-        <div className="p-2.5 sm:p-3.5">
-          <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug line-clamp-1 group-hover:text-[#EA580C] transition-colors">
-            {item.name}
-          </h3>
-
-          {item.description && (
-            <p className="mt-0.5 line-clamp-2 text-[10px] sm:text-xs text-slate-500 leading-relaxed font-medium">
+          {item.description ? (
+            <p className="mt-1 line-clamp-2 text-[10px] font-medium leading-relaxed text-slate-500 sm:text-xs">
               {item.description}
             </p>
-          )}
+          ) : null}
         </div>
-      </div>
-
-      {/* Footer: Price & Quick Book Action */}
-      <div className="flex items-center justify-between border-t border-slate-100/90 px-2.5 py-2 sm:px-3.5 sm:py-2.5 bg-slate-50/50">
-        <div>
-          <span className="text-[10px] text-slate-400 font-bold block sm:hidden">Price</span>
-          <p className="text-sm sm:text-base font-black text-[#EA580C] tracking-tight">
-            ₹{item.price}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onBookClick}
-          className="py-1 px-2.5 sm:py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-[#FFF0EB] text-[#EA580C] border border-[#FFEDD5] text-[11px] sm:text-xs font-bold hover:bg-[#EA580C] hover:text-white transition-colors cursor-pointer"
-        >
-          Book Table
-        </button>
       </div>
     </motion.article>
   );

@@ -1,9 +1,10 @@
 import {useEffect, useState} from 'react';
+import {createPortal} from 'react-dom';
 import {useNavigate} from 'react-router-dom';
 import {useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
-import {Calendar, ChevronLeft, Gift, LogOut, Mail, User} from 'lucide-react';
+import {Calendar, ChevronLeft, Gift, LogOut, Mail, User, X} from 'lucide-react';
 import {toast} from 'sonner';
 import Swal from 'sweetalert2';
 import {Button} from '../../components/ui/Button';
@@ -70,7 +71,13 @@ const toDateInput = (value?: string | null) => {
 const fieldClass =
   'rounded-[12px] border-[#E5E7EB] py-3.5 shadow-none focus-within:border-[#93C5FD] focus-within:ring-0 focus-within:shadow-[0_0_0_3px_rgba(147,197,253,0.25)]';
 
-export default function ProfilePage() {
+export default function ProfilePage({
+  asModal = false,
+  onClose,
+}: {
+  asModal?: boolean;
+  onClose?: () => void;
+} = {}) {
   const navigate = useNavigate();
   const {customer, setCustomer, logout} = useAuthStore();
   const [loading, setLoading] = useState(false);
@@ -89,7 +96,7 @@ export default function ProfilePage() {
   const gender = form.watch('gender');
 
   useEffect(() => {
-    if (!customer) return;
+    if (!customer || form.formState.isDirty) return;
     form.reset({
       name: customer.name || '',
       email: customer.email || '',
@@ -97,6 +104,19 @@ export default function ProfilePage() {
       gender: (customer.gender as FormValues['gender']) || '',
     });
   }, [customer, form]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void authApi
+      .me()
+      .then(({data}) => {
+        if (!cancelled && data.data) setCustomer(data.data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [setCustomer]);
 
   const onSave = form.handleSubmit(async values => {
     setLoading(true);
@@ -141,7 +161,7 @@ export default function ProfilePage() {
   const initial = (customer?.name || 'C').charAt(0).toUpperCase();
 
   const actionButtons = (
-    <div className="space-y-3 pt-50 sm:pt-35">
+    <div className="sticky bottom-0 z-20 shrink-0 border-t border-slate-100 bg-white/95 px-5 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
       <Button
         type="submit"
         loading={loading}
@@ -163,17 +183,52 @@ const formatJoinedDate = (dateStr?: string) => {
   });
 };
 
+const membershipType = String(customer?.membershipType || '').trim();
+  const membershipLabel =
+    membershipType && membershipType.toLowerCase() !== 'none'
+      ? `${membershipType.charAt(0).toUpperCase()}${membershipType.slice(1)}`
+      : '';
+  const membershipLine = membershipLabel
+    ? customer?.membershipEndDate
+      ? `${membershipLabel} (${formatJoinedDate(customer.membershipEndDate)})`
+      : membershipLabel
+    : '';
+
+  const profileIdentity = (
+    <div className="mb-6 flex items-center gap-3.5">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#DBEAFE] text-[22px] font-bold text-[#1D4ED8]">
+        {customer?.profileImage ? (
+          <img src={customer.profileImage} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initial
+        )}
+      </div>
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-bold text-[#111111]">{customer?.name || 'My profile'}</h1>
+        {customer?.createdAt ? (
+          <p className="mt-0.5 text-sm text-[#6B7280]">Joined {formatJoinedDate(customer.createdAt)}</p>
+        ) : null}
+        {membershipLine ? (
+          <p className={`mt-0.5 text-sm font-semibold ${customer?.membershipExpired ? 'text-rose-600' : 'text-[#1D4ED8]'}`}>
+            {membershipLine}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+
 const profileFields = (
     <>
-      <label className="block space-y-2">
+      <div className={`grid gap-3 ${isDesktop && !asModal ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      <label className="block min-w-0 space-y-2">
         <span className="text-[14px] font-semibold text-[#111111]">
           Full name <span className="text-[#EF4444]">*</span>
         </span>
         <div className={`flex items-center gap-3 border bg-white px-4 ${fieldClass}`}>
-          <User className="h-[18px] w-[18px] text-[#9CA3AF]" strokeWidth={1.75} />
+          <User className="h-[18px] w-[18px] shrink-0 text-[#9CA3AF]" strokeWidth={1.75} />
           <input
-            placeholder="Enter your full name"
-            className="w-full border-0 bg-transparent text-[15px] outline-none placeholder:text-[#9CA3AF]"
+            placeholder="Full name"
+            className="w-full min-w-0 border-0 bg-transparent text-[15px] outline-none placeholder:text-[#9CA3AF]"
             {...form.register('name')}
           />
         </div>
@@ -185,11 +240,12 @@ const profileFields = (
       <Input
         label="Email"
         leftIcon={<Mail className="h-[18px] w-[18px]" strokeWidth={1.75} />}
-        placeholder="Enter your email address"
+        placeholder="Email"
         className={fieldClass}
         error={form.formState.errors.email?.message}
         {...form.register('email')}
       />
+      </div>
 
       <label className="block space-y-2">
         <span className="text-[14px] font-semibold text-[#111111]">Birthday</span>
@@ -236,68 +292,44 @@ const profileFields = (
     </>
   );
 
-  if (!isDesktop) {
-    return (
-      <div className="min-h-dvh bg-white px-5 pb-10 pt-6">
-        <div className="mb-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
-            aria-label="Go back"
-          >
-            <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
-          </button>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-red-100 bg-white text-[#EF4444] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 hover:bg-red-50 hover:border-red-200 cursor-pointer"
-            aria-label="Logout"
-            title="Logout"
-          >
-            <LogOut className="h-4 w-4" strokeWidth={2} />
-          </button>
-        </div>
-        <div className="mb-6 flex items-center gap-3.5">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#DBEAFE] text-[22px] font-bold text-[#1D4ED8]">
-            {customer?.profileImage ? (
-              <img
-                src={customer.profileImage}
-                alt={customer.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              initial
-            )}
+  if (asModal) {
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-6"
+        onClick={onClose}
+      >
+        <form
+          onSubmit={onSave}
+          onClick={event => event.stopPropagation()}
+          className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-bold text-[#111111]">My profile</h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500"
+                aria-label="Close profile"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {profileIdentity}
+            <div className="space-y-4">{profileFields}</div>
           </div>
-          <div className="min-w-0">
-            {customer?.name ? (
-              <h1 className="text-2xl font-bold text-[#111111]">{customer.name}</h1>
-            ) : null}
-            <p className="text-sm text-[#9CA3AF]">
-              {customer?.customerId || 'Customer'} · {customer?.mobile}
-            </p>
-            {customer?.createdAt ? (
-              <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue">
-                {formatJoinedDate(customer.createdAt)}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <form onSubmit={onSave} className="space-y-4">
-          {profileFields}
           {actionButtons}
         </form>
-      </div>
+      </div>,
+      document.body,
     );
   }
 
-  return (
-    <div className="brush-bg min-h-screen px-4 py-8 sm:px-8">
-      <div className="mx-auto flex max-w-xl flex-col gap-6">
-        <div className="auth-card rounded-[28px] border border-white/80 p-6 sm:p-8">
-          <div className="mb-5 flex items-center justify-between">
+  if (!isDesktop) {
+    return (
+      <form onSubmit={onSave} className="flex min-h-dvh flex-col bg-white">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-6">
+          <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
               onClick={() => navigate(-1)}
@@ -316,39 +348,44 @@ const profileFields = (
               <LogOut className="h-4 w-4" strokeWidth={2} />
             </button>
           </div>
-          <div className="mb-6 flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-2xl font-bold text-brand-blue">
-              {customer?.profileImage ? (
-                <img
-                  src={customer.profileImage}
-                  alt={customer.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initial
-              )}
-            </div>
-            <div>
-              {customer?.name ? (
-                <h1 className="text-2xl font-bold text-ink">{customer.name}</h1>
-              ) : null}
-              <p className="text-sm text-muted">
-                {customer?.customerId || 'Customer'} · {customer?.mobile}
-              </p>
-              {customer?.createdAt ? (
-                <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue">
-                  Member since:{formatJoinedDate(customer.createdAt)}
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          <form onSubmit={onSave} className="space-y-4">
-            {profileFields}
-            {actionButtons}
-          </form>
+          {profileIdentity}
+          <div className="space-y-4">{profileFields}</div>
         </div>
-      </div>
+        {actionButtons}
+      </form>
+    );
+  }
+
+  return (
+    <div className="brush-bg min-h-screen px-4 py-8 sm:px-8">
+      <form onSubmit={onSave} className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-3xl flex-col">
+        <div className="auth-card flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-white/80">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 sm:p-8">
+            <div className="mb-5 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+                aria-label="Go back"
+              >
+                <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-red-100 bg-white text-[#EF4444] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 hover:bg-red-50 hover:border-red-200 cursor-pointer"
+                aria-label="Logout"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </div>
+            {profileIdentity}
+            <div className="space-y-4">{profileFields}</div>
+          </div>
+          {actionButtons}
+        </div>
+      </form>
     </div>
   );
 }

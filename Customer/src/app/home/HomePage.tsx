@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
 import {MobileHeader} from '../../components/dashboard/TopNavbar';
+import {HeroBanner} from '../../components/dashboard/HeroBanner';
 import {
   ActionCards,
   ExploreGrid,
@@ -108,6 +109,7 @@ export default function HomePage() {
           />
 
           <div className="space-y-5 pb-20">
+            <HeroBanner />
             <ExploreGrid onItemClick={handleExploreClick} />
             <MembershipBanner />
           </div>

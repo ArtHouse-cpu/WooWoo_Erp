@@ -20,6 +20,7 @@ import {creditInviteReward} from './referral.service.js';
 import Wallet from '../../../models/wallet.model.js';
 import {creditPlanPurchaseCashback} from '../../../controllers/subscription.controller.js';
 import {ensureSubscriptionForMembership} from '../../../services/subscriptionFromMembership.service.js';
+import {attachMembershipExpiry} from '../../../services/membershipEligibility.service.js';
 import {
   generateAccessToken,
   createRefreshToken,
@@ -617,7 +618,9 @@ export const getCustomerProfile = async customerId => {
     error.status = 404;
     throw error;
   }
-  return customer.toSafeObject();
+  const safe = customer.toSafeObject();
+  await attachMembershipExpiry([safe]);
+  return safe;
 };
 
 export const updateCustomerProfile = async (customerId, payload) => {
@@ -678,7 +681,9 @@ export const updateCustomerProfile = async (customerId, payload) => {
     await notifyAccountCreated(customer);
   }
 
-  return customer.toSafeObject();
+  const safe = customer.toSafeObject();
+  await attachMembershipExpiry([safe]);
+  return safe;
 };
 
 export const deleteCustomerAccount = async (res, customerId) => {

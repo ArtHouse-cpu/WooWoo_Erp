@@ -302,6 +302,7 @@ type ExpenseRow = {
   mode: PaymentMode;
   status: ExpenseStatus;
   date: string;
+  createdAt: string;
   addedBy: string;
   addedById: string;
   createdBy: string;
@@ -646,7 +647,7 @@ function mapExpenceToRow(item: any, index: number): ExpenseRow {
   return {
     id: index + 1,
     _id: String(item?._id ?? ""),
-    expenseCode: String(item?.expenseCode || `EXP-${index + 1}`),
+    expenseCode: String(item?.expenseCode || ""),
     title: String(item?.title || "").trim() || "Untitled expense",
     category: asCategory(item?.category),
     segment: asSegment(item?.segment ?? item?.segement),
@@ -667,6 +668,7 @@ function mapExpenceToRow(item: any, index: number): ExpenseRow {
     mode: asMode(item?.mode, status),
     status,
     date: toDateYmd(item?.date || item?.createdAt),
+    createdAt: String(item?.createdAt || item?.date || ""),
     createdBy: createdName || "—",
     createdById: staffId(item?.createdBy),
     addedBy: addedName || createdName || "System",
@@ -981,11 +983,26 @@ export default function ExpenseScreen() {
     }
   };
 
+  // Expense id follows creation order: the oldest expense is EXP-1.
+  const indexedRows = useMemo(() => {
+    const ranked = [...rows].sort((a, b) => {
+      const at = new Date(a.createdAt || a.date || 0).getTime() || 0;
+      const bt = new Date(b.createdAt || b.date || 0).getTime() || 0;
+      if (at !== bt) return at - bt;
+      return a._id.localeCompare(b._id);
+    });
+    const indexById = new Map(ranked.map((row, index) => [row._id, index + 1]));
+    return rows.map((row) => {
+      const index = indexById.get(row._id) || row.id;
+      return {...row, id: index, expenseCode: `EXP-${index}`};
+    });
+  }, [rows]);
+
   // ─── Filtered Data ─────────────────────────────────────────────────────────
 
   const filteredData = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return rows.filter((row) => {
+    return indexedRows.filter((row) => {
       // Tab filter (by segment or category)
       if (selectedTab !== "all") {
         const segMatch = row.segment?.toLowerCase() === selectedTab.toLowerCase();
@@ -1012,7 +1029,7 @@ export default function ExpenseScreen() {
 
       return true;
     });
-  }, [rows, selectedTab, statusFilter, search]);
+  }, [indexedRows, selectedTab, statusFilter, search]);
 
   // ─── Sorting ───────────────────────────────────────────────────────────────
 
@@ -2142,7 +2159,7 @@ export default function ExpenseScreen() {
           <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-white text-xs font-semibold text-slate-600">
-                <th className="w-12 py-3.5 px-4 text-center text-slate-400">#</th>
+                <th className="w-24 py-3.5 px-4 text-left text-slate-400">Exp ID</th>
                 <th className="py-3.5 px-4 font-semibold text-slate-700">
                   Title / Description
                 </th>
@@ -2188,8 +2205,8 @@ export default function ExpenseScreen() {
                       className="group transition-colors hover:bg-slate-50/70"
                     >
                       {/* # */}
-                      <td className="py-3.5 px-4 text-center text-xs font-medium text-slate-400">
-                        {globalIdx + 1}
+                      <td className="py-3.5 px-4 text-left text-xs font-semibold text-slate-500">
+                        {row.expenseCode}
                       </td>
 
                       {/* Title / Description */}

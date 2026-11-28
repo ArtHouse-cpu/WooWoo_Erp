@@ -182,7 +182,7 @@ export const getAllExpences = async (req, res) => {
     if(search){
       const regex=new RegExp(escapeRegex(search),'i');
       query.$or=[
-        {expensesCode:regex},
+        {expenseCode:regex},
         {title:regex},
         {category:regex},
         {paidTo:regex},
@@ -208,10 +208,22 @@ const dateFilter={};
     .limit(limit)
     .lean();
 
+    const orderedIds = await Expence.find({})
+      .select('_id')
+      .sort({createdAt: 1, _id: 1})
+      .lean();
+    const expenseIndexById = new Map(
+      orderedIds.map((doc, index) => [String(doc._id), index + 1]),
+    );
+
     return res.status(200).json({
       success:true,
       message:'Expenses fetched successfully.',
-     expences: expences.map(enrichExpence),
+     expences: expences.map(item => {
+       const enriched = enrichExpence(item);
+       const index = expenseIndexById.get(String(item._id));
+       return index ? {...enriched, expenseCode: `EXP-${index}`} : enriched;
+     }),
       total: expences.length,
       limit,
     })
@@ -333,6 +345,9 @@ export const addExpencesById = async (req, res) => {
         paidAt: initialPayment.paidAt ? new Date(initialPayment.paidAt) : new Date(),
       });
     }
+
+    const expenseCount = await Expence.countDocuments();
+    payload.expenseCode = `EXP-${expenseCount + 1}`;
 
     const expence = await Expence.create({...payload, createdBy, addedBy, paidBy, payments});
     return res.status(201).json({

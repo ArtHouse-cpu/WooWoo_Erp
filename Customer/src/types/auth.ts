@@ -22,6 +22,8 @@ export interface Customer {
   rewardPoints?: number;
   loginType?: string;
   membershipType?: 'none' | 'pro' | 'premium' | 'special' | 'junior' | 'general';
+  membershipEndDate?: string | null;
+  membershipExpired?: boolean;
   profileSetupCompleted?: boolean;
   onboardingCompleted?: boolean;
   referralCode?: string | null;

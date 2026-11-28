@@ -401,3 +401,41 @@ export const deleteFoodOffer = async (req, res) => {
     return res.status(500).json({success: false, message: 'Failed to remove food offer.'});
   }
 };
+
+/** Public customer menu. Active foods only, with the fields the menu card shows. */
+export const getCustomerFoods = async (_req, res) => {
+  try {
+    const foods = await Food.find({status: {$ne: 'Inactive'}})
+      .select('name category price description isVeg imageUrl')
+      .sort({category: 1, name: 1})
+      .lean();
+
+    const categories = [
+      ...new Set(
+        foods
+          .map(food => String(food.category || '').trim())
+          .filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+
+    return res.status(200).json({
+      success: true,
+      categories,
+      foods: foods.map(food => ({
+        _id: food._id,
+        name: String(food.name || '').trim(),
+        category: String(food.category || 'Food').trim() || 'Food',
+        price: Math.max(0, Number(food.price) || 0),
+        description: String(food.description || '').trim(),
+        isVeg: food.isVeg !== false,
+        imageUrl: food.imageUrl || '',
+      })),
+    });
+  } catch (error) {
+    console.error('getCustomerFoods error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch foods.',
+    });
+  }
+};

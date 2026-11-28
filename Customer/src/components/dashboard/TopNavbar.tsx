@@ -1,9 +1,11 @@
+import {useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {Bell, ChevronDown, Menu, MessageCircle} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {BrandMark} from '../auth/AuthShell';
 import {SearchBar} from './SearchBar';
 import {useAuthStore} from '../../store/authStore';
+import ProfilePage from '../../app/auth/ProfilePage';
 
 type Props = {
   onMenuClick: () => void;
@@ -91,30 +93,51 @@ export function MobileHeader({
   onMenuClick: () => void;
   onNotificationClick?: () => void;
 }) {
+  const customer = useAuthStore(state => state.customer);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const initial = (customer?.name || 'C').charAt(0).toUpperCase();
+
   return (
-    <header className="mb-4 flex items-center justify-between gap-3 xl:hidden">
-      <button
-        type="button"
-        onClick={onMenuClick}
-        className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95 cursor-pointer"
-        aria-label="Open menu"
-      >
-        <Menu className="h-[20px] w-[20px]" strokeWidth={2} />
-      </button>
-      <div className="flex min-w-0 flex-1 justify-center">
-        <BrandMark compact showTagline={false} />
-      </div>
-      <button
-        type="button"
-        onClick={onNotificationClick}
-        className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95 cursor-pointer"
-        aria-label="Notifications"
-      >
-        <Bell className="h-[20px] w-[20px]" strokeWidth={2} />
-        <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-[#EF4444] px-1 text-[9px] font-extrabold text-white">
-          3
-        </span>
-      </button>
-    </header>
+    <>
+      <header className="mb-4 flex items-center justify-between gap-3 xl:hidden">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95 cursor-pointer"
+          aria-label="Open menu"
+        >
+          <Menu className="h-[20px] w-[20px]" strokeWidth={2} />
+        </button>
+        <div className="flex min-w-0 flex-1 justify-center">
+          <BrandMark compact showTagline={false} />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onNotificationClick}
+            className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95 cursor-pointer"
+            aria-label="Notifications"
+          >
+            <Bell className="h-[20px] w-[20px]" strokeWidth={2} />
+            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-[#EF4444] px-1 text-[9px] font-extrabold text-white">
+              3
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-black/[0.04] bg-[#DBEAFE] text-sm font-bold text-[#1D4ED8] shadow-[0_4px_12px_rgba(15,23,42,0.05)]"
+            aria-label="Open profile"
+          >
+            {customer?.profileImage ? (
+              <img src={customer.profileImage} alt="" className="h-full w-full object-cover" />
+            ) : (
+              initial
+            )}
+          </button>
+        </div>
+      </header>
+      {profileOpen ? <ProfilePage asModal onClose={() => setProfileOpen(false)} /> : null}
+    </>
   );
 }

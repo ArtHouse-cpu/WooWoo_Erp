@@ -44,6 +44,7 @@ import {
   getCustomerProducts,
   upload,
 } from '../../../controllers/product.controller.js';
+import {getCustomerFoods} from '../../../controllers/food.controller.js';
 import {capturePortalEnquiry} from '../../../controllers/lead.controller.js';
 import {
   getMyActivity,
@@ -141,6 +142,7 @@ router.get('/space/availability', getCustomerSpaceAvailability);
 router.get('/space/:id', getCustomerSpaceById);
 router.get('/product', getCustomerProducts);
 router.get('/product/:id', getCustomerProductById);
+router.get('/food', getCustomerFoods);
 
 router.get('/me', authenticateCustomer, authorizeCustomer('active'), me);
 router.get(

@@ -12,7 +12,9 @@ function membershipLabel(type?: string) {
 export function HeroBanner() {
   const customer = useAuthStore(s => s.customer);
   const firstName = (customer?.name || 'Member').split(' ')[0];
-  const wallet = Number(customer?.walletBalance ?? 0);
+  const wallet = Number(
+    customer?.walletBalance ?? customer?.walletAmount ?? 0,
+  );
 
   return (
     <motion.section
