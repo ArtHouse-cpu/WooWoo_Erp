@@ -285,7 +285,16 @@ function FoodItemCard({item}: {item: FoodMenuItem}) {
       initial={{opacity: 0, y: 10}}
       animate={{opacity: 1, y: 0}}
       transition={{duration: 0.2}}
-      className="group flex flex-col justify-between overflow-hidden rounded-[18px] sm:rounded-[22px] border border-black/[0.06] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(234,88,12,0.12)] hover:-translate-y-1 transition-all duration-200"
+      onClick={onBookClick}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onBookClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="group flex cursor-pointer flex-col justify-between overflow-hidden rounded-[18px] sm:rounded-[22px] border border-black/[0.06] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(234,88,12,0.12)] hover:-translate-y-1 transition-all duration-200"
     >
       <div>
         {/* Food Image Container with consistent dimensions */}
